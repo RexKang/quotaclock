@@ -20,6 +20,7 @@ import (
 	"github.com/RexKang/QuotaClock/internal/crypto"
 	"github.com/RexKang/QuotaClock/internal/logx"
 	"github.com/RexKang/QuotaClock/internal/persist"
+	"github.com/RexKang/QuotaClock/internal/trend"
 	"github.com/RexKang/QuotaClock/web"
 )
 
@@ -32,6 +33,7 @@ type testEnv struct {
 	http       *httptest.Server
 	sched      *collector.Scheduler
 	store      *collector.Store
+	trends     *trend.Store
 	logBuf     *syncBuffer
 	key        []byte
 }
@@ -136,18 +138,21 @@ func newEnv(t *testing.T, configure func(key []byte, f *config.File)) *testEnv {
 
 	store := collector.NewStore("test")
 	sched := collector.NewScheduler(runtime, store, collector.NewClient("test"))
+	// v0.4.0：趋势存储与生产装配一致（同目录 trends.json），便于断言「删 Key 连带清理」
+	trends := trend.New(persist.TrendsPathOf(dir))
 	srv := New(Options{
 		Version:         "test-1.0",
 		ConfigPath:      cfgPath,
 		MasterKey:       key,
 		SessionKey:      crypto.SessionKey(key),
 		Store:           store,
+		Trends:          trends,
 		Static:          []byte("<html>QuotaClock static</html>"),
 		Icons:           web.Icons(),
 		OnConfigChanged: sched.Reload,
 	}, f, runtime)
 
-	env := &testEnv{t: t, dir: dir, configPath: cfgPath, srv: srv, sched: sched, store: store, logBuf: logBuf, key: key}
+	env := &testEnv{t: t, dir: dir, configPath: cfgPath, srv: srv, sched: sched, store: store, trends: trends, logBuf: logBuf, key: key}
 	env.http = httptest.NewServer(srv.Handler())
 	t.Cleanup(func() { env.http.Close(); logx.SetOutput(os.Stdout) })
 	return env

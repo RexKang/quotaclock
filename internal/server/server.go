@@ -17,6 +17,7 @@ import (
 	"github.com/RexKang/QuotaClock/internal/crypto"
 	"github.com/RexKang/QuotaClock/internal/logx"
 	"github.com/RexKang/QuotaClock/internal/persist"
+	"github.com/RexKang/QuotaClock/internal/trend"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -37,6 +38,9 @@ type Options struct {
 	Store  *collector.Store  // 快照仓库
 	Static []byte            // 内嵌静态页
 	Icons  map[string][]byte // 内嵌图标（文件名 → 内容，白名单见 web.IconNames）
+
+	// Trends 用量趋势（v0.4.0；nil = 不提供趋势接口，测试装配可省）
+	Trends *trend.Store
 
 	// OnConfigChanged 配置保存成功后的热生效钩子（main 注入 scheduler.Reload）。
 	OnConfigChanged func(*config.Runtime)
@@ -69,6 +73,7 @@ type Server struct {
 	limiter  *Limiter
 	client   *collector.Client
 	store    *collector.Store
+	trends   *trend.Store
 	icons    map[string][]byte
 }
 
@@ -85,6 +90,7 @@ func New(opt Options, initial *config.File, runtime *config.Runtime) *Server {
 		limiter:    NewLimiter(),
 		client:     collector.NewClient(opt.Version),
 		store:      opt.Store,
+		trends:     opt.Trends,
 		icons:      opt.Icons,
 	}
 	s.cfg.Store(runtime)
@@ -114,6 +120,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /favicon.ico", s.handleFavicon)
 	mux.HandleFunc("GET /icons/{file}", s.handleIcon)
 	mux.HandleFunc("GET /api/quotas", s.handleQuotas)
+	mux.HandleFunc("GET /api/trends", s.handleTrends)
 	mux.HandleFunc("GET /api/config", s.handleGetConfig)
 	mux.HandleFunc("PUT /api/config", s.requireWrite(s.handlePutConfig))
 	mux.HandleFunc("POST /api/login", s.handleLogin)
@@ -310,6 +317,70 @@ func (s *Server) handleQuotas(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, snap)
 }
 
+// handleTrends GET /api/trends：用量趋势视图（公开，与 /api/quotas 同级）。
+//
+// 为什么公开：趋势图里是「这个 Key 这些天用了多少」，与总览页展示的数据同级；
+// 看板本身免登录可看（v0.2.x 既定），单独给趋势加压只会让页面上出现两个权限语汇。
+// 真正的敏感物是 token（掩码仅登录可见），不在这里。
+//
+// 入参 days：回看天数（默认 400，上限 3650）。响应的 daily/hours 是**定长连续数组**，
+// 缺数据的位置是 null——前端因此不需要自己对齐日期，也不会把「没采样」画成 0。
+func (s *Server) handleTrends(w http.ResponseWriter, r *http.Request) {
+	days := 0
+	if v := r.URL.Query().Get("days"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n <= 0 {
+			writeErr(w, http.StatusBadRequest, "INVALID_REQUEST", "days 必须是正整数")
+			return
+		}
+		days = n
+	}
+	if s.trends == nil {
+		// 未装配趋势（部分测试/裁剪装配）：返回空视图而不是 500，前端自然显示空态
+		writeJSON(w, http.StatusOK, &trend.View{Version: persist.TrendsVersion, Days: 0, Keys: []trend.KeyView{}})
+		return
+	}
+	writeJSON(w, http.StatusOK, s.trends.Snapshot(time.Now(), days))
+}
+
+// purgeRemovedTrends 清理「已被删掉的 API Key」的趋势数据（用户需求 3）。
+//
+// 两层分工：确认框在前端（删除时告知「趋势数据也会被清理」），这里是**数据层兜底**——
+// 导入配置、直接调用 PUT 都绕过 UI，不兜底就会留下永久孤儿数据。
+// 只认 runtime id 的消失：改名（name 变）与停用（enabled=false）都不动数据。
+func (s *Server) purgeRemovedTrends(old, next *config.File) {
+	if s.trends == nil || old == nil || next == nil {
+		return
+	}
+	keep := map[string]bool{}
+	for i := range next.Providers {
+		fp := &next.Providers[i]
+		for j := range fp.AccessKeys {
+			keep[config.RuntimeID(fp.Platform, fp.AccessKeys[j].ID)] = true
+		}
+	}
+	var gone []string
+	for i := range old.Providers {
+		fp := &old.Providers[i]
+		for j := range fp.AccessKeys {
+			id := config.RuntimeID(fp.Platform, fp.AccessKeys[j].ID)
+			if !keep[id] {
+				gone = append(gone, id)
+			}
+		}
+	}
+	if len(gone) == 0 {
+		return
+	}
+	removed, err := s.trends.Purge(gone)
+	if err != nil {
+		logx.Warnf("趋势数据清理写盘失败（内存已清理，重启后不再出现）: %v", err)
+	}
+	if len(removed) > 0 {
+		logx.Infof("随配置删除清理了 %d 个 API Key 的趋势数据: %s", len(removed), strings.Join(removed, "、"))
+	}
+}
+
 // handleGetConfig GET /api/config：脱敏视图（掩码仅登录可见）。
 func (s *Server) handleGetConfig(w http.ResponseWriter, r *http.Request) {
 	f := s.file.Load()
@@ -451,6 +522,8 @@ func (s *Server) handlePutConfig(w http.ResponseWriter, r *http.Request) {
 	if s.onChanged != nil {
 		s.onChanged(runtime)
 	}
+	// 被删掉的 Key：连同其趋势数据一起清理（用户需求 3；确认框在前端，这里是数据层兜底）
+	s.purgeRemovedTrends(old, newFile)
 	keys := 0
 	for i := range newFile.Providers {
 		keys += newFile.Providers[i].KeyCount()
