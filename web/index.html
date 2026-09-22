@@ -210,7 +210,8 @@
   .tcols { position: absolute; left: 0; right: 0; display: flex; align-items: flex-end; justify-content: center; gap: 4px; }
   .tcol { position: relative; flex: 1 1 0; max-width: 72px; min-width: 3px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
   .tbar { width: 100%; border-radius: 2px 2px 0 0; }
-  .tstub { width: 100%; height: 2px; background: #2c3346; }
+  /* 0 值：轴上不画任何可见痕迹（画 2px 灰条会被读成「一个很小的值」），只留透明的悬停命中区 */
+  .tzero { width: 100%; height: 4px; background: transparent; }
   /* 无采样槽：绝对定位锚到基线上（bottom:0 = 该列的底边 = 横轴），否则它会浮在有数据的柱之上 11px */
   .tnone { position: absolute; left: 0; right: 0; bottom: 0; height: 154px; border: 1px dashed #232a38;
            border-radius: 2px; display: flex; align-items: center; justify-content: center; color: #6f778a; font-size: 11px; }
@@ -339,15 +340,13 @@
   <div class="status-line">
     <span id="connTrend"><span class="dot"></span></span>
   </div>
-  <div id="trendHint" class="hint"></div>
   <div id="trendTip" class="ttip"></div>
   <div class="tlegend">
     <span><i style="background:var(--ok)"></i>该时段用量 &lt; 70%</span>
     <span><i style="background:var(--warn)"></i>70 – 90%</span>
     <span><i style="background:var(--err)"></i>≥ 90%（一小时内烧掉近一整个 5 小时窗口）</span>
     <span><i style="background:var(--accent)"></i>金额类（消费没有健康语义，不上红黄绿）</span>
-    <span><i style="background:#2c3346;height:2px"></i>0.00：真有采样，只是没用</span>
-    <span><span class="tln"></span>无采样：进程没跑 / 采集失败，不画成 0</span>
+    <span><span class="tln"></span>无采样：进程没跑 / 采集失败（不画成 0；0 值则什么都不画）</span>
   </div>
   <div id="trendList"></div>
 </div>
@@ -1611,8 +1610,9 @@ function trendChartHtml(kind, series, unit) {
       return `<div class="tcol">${tag}<div class="tnone" ${tip}>—</div></div>`;
     }
     if (!(v > 0)) {
-      // 顺序必须与普通柱一致（标签在前、柱体在后）：柱体是最后一个子元素才会落在基线上
-      return `<div class="tcol">${tag}${dense ? '' : '<div class="tval">0.00</div>'}<div class="tstub" ${tip}></div></div>`;
+      // 顺序必须与普通柱一致（标签在前、柱体在后）：柱体是最后一个子元素才会落在基线上。
+      // 0 值画「透明命中区」而不是灰条 —— 轴上任何可见痕迹都会被读成有值。
+      return `<div class="tcol">${tag}${dense ? '' : '<div class="tval">0.00</div>'}<div class="tzero" ${tip}></div></div>`;
     }
     const px = Math.max(2, Math.round(v / scale * TREND_BAR_H * 10) / 10);
     const color = kind === 'balance' ? 'var(--accent)' : sevColor(slotSeverity(v, undefined));
@@ -1694,38 +1694,12 @@ function trendCardHtml(prov, k) {
   </div>`;
 }
 
-function renderTrendHint(provs) {
-  const el = $('#trendHint');
-  if (!el) return;
-  if (trendErr) {
-    el.innerHTML = `趋势数据加载失败（${esc(trendErr)}）——「总览」与「接口」仍可正常使用；点右上角「刷新」重试。`;
-    return;
-  }
-  const days = provs.map(p => { const k = trendKeyOf(p.id); return k ? k.total_days : 0; });
-  const maxDays = days.length ? Math.max(...days) : 0;
-  const hours = provs.map(p => {
-    const k = trendKeyOf(p.id);
-    return k ? (k.hours || []).filter(Boolean).length : 0;
-  });
-  const maxHours = hours.length ? Math.max(...hours) : 0;
-  if (!maxDays) {
-    el.innerHTML = '趋势数据从首次采集开始积累：上游接口只给当前值、不给历史，所以这里补不回过去。'
-      + '<b>采到一次数据，五个区间里就都能看到那根柱子</b>（当日 = 1 根小时柱、7 日与月度 = 1 根日柱、季度与年度 = 1 根周/月柱）；'
-      + '区间长度分别要 1 小时 / 7 / 30 / 90 / 365 天后才被数据填满。服务没运行的时段记为「无采样」空槽，不会画成 0.00%。';
-    return;
-  }
-  el.innerHTML = `<b>采到一次数据，五个区间里就都能看到那根柱子</b>——` 
-    + `当前已积累 <b>${maxDays}</b> 天 / <b>${maxHours}</b> 个小时槽（区间长度依次要 1 小时 / 7 / 30 / 90 / 365 天才填满）。`
-    + '柱高 = <b>该时段的实际用量</b>（相邻采样的额度差额之和，跨窗口重置已补回）；每张图可独立切区间：当日按小时、7 日与月度按天、季度按周、年度按月。';
-}
-
 function renderTrend() {
   const box = $('#trendList');
   if (!box) return;
   const all = (snap && snap.providers) || [];
   const provs = all.filter(p => p.status !== 'disabled');
   const disabledCount = all.length - provs.length;
-  renderTrendHint(provs);
   if (!provs.length) {
     box.innerHTML = all.length
       ? '<div class="empty">所有平台都已停用——「趋势」只展示在用平台，到「设置 → 平台管理」勾选「启用该平台」即可恢复</div>'
