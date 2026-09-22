@@ -203,7 +203,9 @@
   .tyaxis span { position: absolute; right: 4px; transform: translateY(50%); font-size: 10px; color: #6f778a; font-family: var(--mono); }
   .tyaxis span.tunit { bottom: 4px; right: 6px; transform: none; }
   .tplot { position: relative; flex: 1; min-width: 0; height: 188px; }
-  .tgridline { position: absolute; left: 0; right: 0; border-top: 1px dashed #262b3b; }
+  /* 悬停指示带：鼠标在绘图区里按 x 对齐到对应时段（不要求压在柱子上），手感对齐图表插件 */
+  .tband { position: absolute; display: none; background: rgba(255,255,255,.05); border-radius: 3px; pointer-events: none; }
+  .tcol.hov .tbar { box-shadow: 0 0 0 1px rgba(255,255,255,.22); }
   /* 横轴（下侧坐标轴）：柱脚踩的这条实线，横轴标签在它下面 */
   .taxisline { position: absolute; left: 0; right: 0; border-top: 1px solid #333b4f; }
   .tthrow { position: absolute; left: 0; right: 0; border-top: 1px solid rgba(248,113,113,.35); }
@@ -212,9 +214,10 @@
   .tbar { width: 100%; border-radius: 2px 2px 0 0; }
   /* 0 值：轴上不画任何可见痕迹（画 2px 灰条会被读成「一个很小的值」），只留透明的悬停命中区 */
   .tzero { width: 100%; height: 4px; background: transparent; }
-  /* 无采样槽：绝对定位锚到基线上（bottom:0 = 该列的底边 = 横轴），否则它会浮在有数据的柱之上 11px */
-  .tnone { position: absolute; left: 0; right: 0; bottom: 0; height: 154px; border: 1px dashed #232a38;
-           border-radius: 2px; display: flex; align-items: center; justify-content: center; color: #6f778a; font-size: 11px; }
+  /* 无采样：**不**逐列画虚线框 —— 相邻列的框顶边会在同一条水平线上连成假网格线（实测 12 列全在 top:12px），
+     改成把连续的无采样时段合并成一条淡色区段（见 paintNoSampleRuns）。列本身只留悬停命中。 */
+  .tnrun { position: absolute; top: 0; height: 166px; background: rgba(255,255,255,.028);
+           border-left: 1px dashed #2b3244; border-right: 1px dashed #2b3244; border-radius: 3px; pointer-events: none; }
   .tval { font-size: 9.5px; line-height: 11px; height: 11px; color: #c3cbd9; font-family: var(--mono); white-space: nowrap; }
   .tval.pk { color: #e6e9f2; font-weight: 600; }
   .ttag { font-size: 9.5px; line-height: 11px; height: 11px; color: var(--warn); white-space: nowrap; }
@@ -346,7 +349,7 @@
     <span><i style="background:var(--warn)"></i>70 – 90%</span>
     <span><i style="background:var(--err)"></i>≥ 90%（一小时内烧掉近一整个 5 小时窗口）</span>
     <span><i style="background:var(--accent)"></i>金额类（消费没有健康语义，不上红黄绿）</span>
-    <span><span class="tln"></span>无采样：进程没跑 / 采集失败（不画成 0；0 值则什么都不画）</span>
+    <span><i style="background:rgba(255,255,255,.10);border:1px dashed #2b3244"></i>无采样：进程没跑 / 采集失败（淡色区段；0 值则什么都不画）</span>
   </div>
   <div id="trendList"></div>
 </div>
@@ -1590,8 +1593,6 @@ function trendChartHtml(kind, series, unit) {
   const yaxis = ticks.map(tk =>
     `<span style="bottom:${Math.round(TREND_BAR_H * tk / 100) + TREND_AXIS_H}px">${tickText(kind, scale * tk / 100)}</span>`).join('')
     + `<span class="tunit">${esc(unit)}</span>`;
-  const grid = ticks.map(tk =>
-    `<div class="tgridline" style="bottom:${Math.round(TREND_BAR_H * tk / 100) + TREND_AXIS_H}px"></div>`).join('');
   // 百分比口径：刻度正好是 0-100 时，顶线就是 100%；刻度超过 100 时，在 100 处单独画「满窗」线
   const ref = (kind === 'percent' && scale > 100)
     ? `<div class="tthrow" style="bottom:${Math.round(TREND_AXIS_H + TREND_BAR_H * 100 / scale)}px"></div>`
@@ -1607,12 +1608,13 @@ function trendChartHtml(kind, series, unit) {
     const tag = s.topup ? `<span class="${dense ? 'tdot' : 'ttag'}">${dense ? '' : '充值'}</span>` : '';
     const tip = `data-tip='${tipAttr(s.tip)}'`;
     if (v === null) {
-      return `<div class="tcol">${tag}<div class="tnone" ${tip}>—</div></div>`;
+      // 只留一个可被悬停吸附的列（视觉由 paintNoSampleRuns 的区段淡带表达）
+      return `<div class="tcol nosample" ${tip}>${tag}</div>`;
     }
     if (!(v > 0)) {
       // 顺序必须与普通柱一致（标签在前、柱体在后）：柱体是最后一个子元素才会落在基线上。
       // 0 值画「透明命中区」而不是灰条 —— 轴上任何可见痕迹都会被读成有值。
-      return `<div class="tcol">${tag}${dense ? '' : '<div class="tval">0.00</div>'}<div class="tzero" ${tip}></div></div>`;
+      return `<div class="tcol" ${tip}>${tag}${dense ? '' : '<div class="tval">0.00</div>'}<div class="tzero"></div></div>`;
     }
     const px = Math.max(2, Math.round(v / scale * TREND_BAR_H * 10) / 10);
     const color = kind === 'balance' ? 'var(--accent)' : sevColor(slotSeverity(v, undefined));
@@ -1622,8 +1624,8 @@ function trendChartHtml(kind, series, unit) {
     // 精确到 2 位的值在页脚与悬停明细里，那里不受宽度限制
     const short = kind === 'percent' ? (v >= 10 ? String(Math.round(v)) : v.toFixed(1)) : v.toFixed(1);
     const label = (!dense || isPeak) ? `<div class="tval${dense ? ' pk' : ''}">${dense ? short : v.toFixed(2)}</div>` : '';
-    return `<div class="tcol">${tag}${label}
-      <div class="tbar" style="height:${px}px;background:${color}" ${tip}></div></div>`;
+    return `<div class="tcol" ${tip}>${tag}${label}
+      <div class="tbar" style="height:${px}px;background:${color}"></div></div>`;
   }).join('');
   // 横轴：最多 8 个标签
   const step = Math.max(1, Math.ceil(series.length / 8));
@@ -1633,7 +1635,7 @@ function trendChartHtml(kind, series, unit) {
   const empty = hasAny ? '' : '<div class="tempty">该区间暂无采样数据</div>';
   return `<div class="twrap">
     <div class="tyaxis">${yaxis}</div>
-    <div class="tplot">${grid}${axisLine}${ref}
+    <div class="tplot"><div class="tband"></div>${axisLine}${ref}
       <div class="tcols" style="bottom:${TREND_AXIS_H}px;height:${TREND_PLOT_H - TREND_AXIS_H}px">${cols}</div>
       ${xs}${empty}
     </div>
@@ -1708,6 +1710,10 @@ function renderTrend() {
     return;
   }
   box.innerHTML = provs.map(prov => trendCardHtml(prov, trendKeyOf(prov.id))).join('');
+  trendHoverCol = null;
+  hideTrendTip();
+  paintNoSampleRuns();
+  reapplyTrendHover();
   if (!box.dataset.bound) {
     box.dataset.bound = '1';
     box.addEventListener('click', e => {
@@ -1716,17 +1722,24 @@ function renderTrend() {
       trendRange[btn.dataset.tid] = btn.dataset.tseg;
       renderTrend();
     });
-    box.addEventListener('mouseover', e => {
-      const el = e.target.closest('[data-tip]');
-      if (el) showTrendTip(el, e);
-    });
+    // 悬停：鼠标在绘图区里按 x 找最近的一列就展示（对齐图表插件的手感——不用正好压在柱子上）
     box.addEventListener('mousemove', e => {
-      const el = e.target.closest('[data-tip]');
-      if (el) positionTrendTip(e);
+      trendLastPt = { clientX: e.clientX, clientY: e.clientY };
+      const plot = e.target.closest ? e.target.closest('.tplot') : null;
+      if (!plot) { if (trendHoverCol) clearTrendHover(); return; }
+      const col = nearestTrendCol(plot, e.clientX);
+      if (col !== trendHoverCol) {
+        if (trendHoverCol) trendHoverCol.classList.remove('hov');
+        trendHoverCol = col;
+        if (!col) { hideTrendTip(); hideTrendBand(); return; }
+        col.classList.add('hov');
+        showTrendTip(col, e);
+        placeTrendBand(plot, col);
+      } else if (col) {
+        positionTrendTip(e);
+      }
     });
-    box.addEventListener('mouseout', e => {
-      if (e.target.closest('[data-tip]')) hideTrendTip();
-    });
+    box.addEventListener('mouseleave', () => clearTrendHover());
   }
   const withData = provs.filter(p => { const k = trendKeyOf(p.id); return k && k.total_days > 0; }).length;
   setConn('trend', withData ? 'ok' : (trendErr ? 'err' : 'wait'),
@@ -1734,6 +1747,79 @@ function renderTrend() {
 }
 
 /* ---------- 悬停明细（自绘：内容要带增量/采样数/源精度，原生 title 放不下多行） ---------- */
+// 当前悬停的那一列（鼠标在绘图区里按 x 找最近的列，不要求压在柱子上）
+let trendHoverCol = null;
+let trendLastPt = null;
+function nearestTrendCol(plot, clientX) {
+  const cols = plot.querySelectorAll('.tcol');
+  let best = null, bestD = Infinity;
+  for (const c of cols) {
+    const r = c.getBoundingClientRect();
+    const d = Math.abs((r.left + r.right) / 2 - clientX);
+    if (d < bestD) { bestD = d; best = c; }
+  }
+  return best;
+}
+function placeTrendBand(plot, col) {
+  const band = plot.querySelector('.tband');
+  if (!band || !col) return;
+  const pr = plot.getBoundingClientRect(), cr = col.getBoundingClientRect();
+  band.style.left = (cr.left - pr.left - 2) + 'px';
+  band.style.width = (cr.width + 4) + 'px';
+  band.style.top = '0px';
+  band.style.height = (TREND_PLOT_H - TREND_AXIS_H) + 'px';
+  band.style.display = 'block';
+}
+// 统一清除悬停态：明细 + 指示带 + 柱上高亮圈，一个都不能剩（否则移出后描边会留着）
+function clearTrendHover() {
+  if (trendHoverCol) { trendHoverCol.classList.remove('hov'); trendHoverCol = null; }
+  hideTrendTip();
+  hideTrendBand();
+}
+function hideTrendBand() {
+  const band = document.querySelector('#trendList .tband');
+  if (band) band.style.display = 'none';
+}
+// 连续的无采样列合并成一条淡色区段：逐列画框会在顶部连成一条假网格线（实测 12 列 top 全为 12px），
+// 合并后既保住了「无采样 ≠ 0」的可区分，又不产生任何对齐的水平边缘。
+// 位置用百分比，窗口缩放时随 flex 列一起伸缩，不需要 resize 重算。
+function paintNoSampleRuns() {
+  document.querySelectorAll('#trendList .tplot').forEach(plot => {
+    plot.querySelectorAll('.tnrun').forEach(e => e.remove());
+    const cols = [...plot.querySelectorAll('.tcol')];
+    if (!cols.length) return;
+    const pr = plot.getBoundingClientRect();
+    if (!pr.width) return;
+    let i = 0;
+    while (i < cols.length) {
+      if (!cols[i].classList.contains('nosample')) { i++; continue; }
+      let j = i;
+      while (j + 1 < cols.length && cols[j + 1].classList.contains('nosample')) j++;
+      const a = cols[i].getBoundingClientRect(), b = cols[j].getBoundingClientRect();
+      const d = document.createElement('div');
+      d.className = 'tnrun';
+      d.style.left = ((a.left - pr.left) / pr.width * 100).toFixed(3) + '%';
+      d.style.width = ((b.right - a.left) / pr.width * 100).toFixed(3) + '%';
+      plot.insertBefore(d, plot.firstChild);
+      i = j + 1;
+    }
+  });
+}
+
+// 重绘（区间切换 / 轮询刷新）会重建 DOM 并清掉悬停态：指针若还在绘图区里，自动恢复到同一列，
+// 手感与图表插件一致（鼠标不动，明细也不闪掉）
+function reapplyTrendHover() {
+  if (!trendLastPt) return;
+  const el = document.elementFromPoint(trendLastPt.clientX, trendLastPt.clientY);
+  const plot = el && el.closest ? el.closest('.tplot') : null;
+  if (!plot) return;
+  const col = nearestTrendCol(plot, trendLastPt.clientX);
+  if (!col) return;
+  trendHoverCol = col;
+  col.classList.add('hov');
+  showTrendTip(col, trendLastPt);
+  placeTrendBand(plot, col);
+}
 function showTrendTip(el, ev) {
   let tip;
   try { tip = JSON.parse(el.dataset.tip); } catch (e) { return; }
