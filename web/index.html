@@ -186,57 +186,55 @@
   .hint { background: var(--card2); border: 1px dashed var(--border); border-radius: 10px; padding: 13px 16px; font-size: 16px; color: var(--muted); line-height: 1.7; margin-bottom: 18px; }
   .empty { color: var(--muted); text-align: center; padding: 60px 0; font-size: 16px; }
 
-  /* ---------- 趋势页（v0.4.0） ----------
-     行卡固定层高，柱基线跟着层高走：值行 14+3 / 柱上限 42 / 日期行 17 = 76 ≤ 78（图表区高）。
-     改字号必须重新量这三层，否则跨行柱基线会错位（与首页卡片同一纪律）。 */
-  .trow { display: flex; align-items: center; gap: 14px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; height: 96px; padding: 0 16px; margin-bottom: 8px; }
-  .tk { width: 200px; flex: 0 0 200px; }
-  .tk .nm { font-size: 14px; font-weight: 600; }
-  .tk .sub { font-size: 12px; color: #c3cbd9; margin-top: 3px; }
-  .tk .unit { font-size: 12px; color: var(--muted); margin-top: 5px; }
-  .tchart { flex: 1; display: flex; align-items: flex-end; gap: 14px; height: 78px; position: relative; }
-  .tchart .tbase { position: absolute; left: 0; right: 0; bottom: 17px; border-top: 1px solid var(--border); }
-  .tchart .t100 { position: absolute; left: 0; right: 0; bottom: 59px; border-top: 1px dashed #333b4f; }
-  .tcol { width: 26px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 78px; position: relative; z-index: 1; }
-  .tcol .tval { font-size: 10.5px; line-height: 14px; height: 14px; font-family: var(--mono); color: #c3cbd9; margin-bottom: 3px; }
-  .tcol .tbar { width: 26px; border-radius: 3px 3px 0 0; }
-  .tcol .tstub { width: 26px; height: 2px; background: #2c3346; border-radius: 1px; }
-  .tcol .tnone { width: 26px; height: 42px; border: 1px dashed #333b4f; border-radius: 3px; display: flex; align-items: center; justify-content: center; color: #6f778a; font-size: 11px; }
-  .tcol .trg { margin: 0; height: 17px; line-height: 17px; font-size: 11px; color: var(--muted); }
-  .tcol .trg.today { color: #c3cbd9; }
-  .tcol .ttag { font-size: 10px; line-height: 12px; height: 12px; color: var(--warn); white-space: nowrap; margin-bottom: 4px; }
-  .tmore { width: 90px; flex: 0 0 90px; text-align: right; }
-  .tmore a { color: var(--accent); font-size: 13px; text-decoration: none; border-bottom: 1px solid rgba(79,124,255,.35); cursor: pointer; }
-  .tmore .thint { display: block; font-size: 11px; color: var(--muted); margin-top: 4px; }
-  /* 展开态：容器 26(padding) + 195(内容) ；柱上限 155，日期行 16，值行 16+4 */
-  .texpand { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px 18px; margin-bottom: 8px; }
-  .texpand .ttop { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
-  .texpand .ttop .nm { font-size: 14px; font-weight: 600; }
+  /* ---------- 趋势页（v0.4.0）：每个 AK 一张大图 ----------
+     版式与量测基准：Y 轴列 46px；图区 420px（绘图区 380 + 轴行 34 + 顶 6）；柱间距 4px。
+     柱宽自适应（max 72px，稀疏区间居中不拉伸）。 */
+  .tcard { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px 14px; margin-bottom: 14px; }
+  .thead { display: flex; align-items: baseline; gap: 14px; margin-bottom: 6px; flex-wrap: wrap; }
+  .thead .tname { font-size: 15px; font-weight: 600; }
+  .thead .tname .tsub { display: block; font-size: 12px; color: #c3cbd9; font-weight: 400; margin-top: 3px; }
   .tseg { display: flex; gap: 4px; background: var(--card2); border: 1px solid var(--border); border-radius: 10px; padding: 3px; }
   .tseg button { background: none; border: none; color: var(--muted); padding: 5px 12px; border-radius: 7px; font-size: 13px; }
   .tseg button.active { background: var(--accent); color: #fff; }
   .tsum { margin-left: auto; font-size: 12px; color: var(--muted); font-family: var(--mono); line-height: 1.7; text-align: right; }
   .tsum b { color: #c3cbd9; }
-  .tbig { display: flex; align-items: flex-end; gap: 20px; height: 221px; padding-top: 26px; position: relative; }
-  .tbig .tbase2 { position: absolute; left: 0; right: 0; bottom: 16px; border-top: 1px solid var(--border); }
-  .tbig .t100b { position: absolute; left: 0; right: 0; bottom: 171px; border-top: 1px dashed #333b4f; }
-  .tbig .tylab { position: absolute; right: 0; font-size: 10.5px; color: #6f778a; font-family: var(--mono); background: var(--card); padding: 0 3px; }
-  .bcol { flex: 1; max-width: 62px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; height: 195px; position: relative; z-index: 1; }
-  .bcol .bval { font-size: 12px; line-height: 16px; height: 16px; font-family: var(--mono); color: #e6e9f2; margin-bottom: 4px; }
-  .bcol .bbar { width: 100%; border-radius: 4px 4px 0 0; }
-  .bcol .bnone { width: 100%; height: 155px; border: 1px dashed #333b4f; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #6f778a; font-size: 11px; }
-  .bcol .brg { margin: 0; height: 16px; line-height: 16px; font-size: 11px; color: var(--muted); }
-  .tfoot { margin-top: 12px; font-size: 12px; color: var(--muted); line-height: 1.7; }
+  .twrap { display: flex; gap: 8px; }
+  .tyaxis { width: 46px; flex: none; position: relative; height: 420px; }
+  .tyaxis span { position: absolute; right: 4px; transform: translateY(50%); font-size: 10.5px; color: #6f778a; font-family: var(--mono); }
+  .tyaxis span.tunit { bottom: 6px; right: 6px; transform: none; }
+  .tplot { position: relative; flex: 1; min-width: 0; height: 420px; border-bottom: 1px solid var(--border); }
+  .tgridline { position: absolute; left: 0; right: 0; border-top: 1px dashed #262b3b; }
+  .tthrow { position: absolute; left: 0; right: 0; border-top: 1px solid rgba(248,113,113,.35); }
+  .tcols { position: absolute; left: 0; right: 0; display: flex; align-items: flex-end; justify-content: center; gap: 4px; }
+  .tcol { flex: 1 1 0; max-width: 72px; min-width: 3px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
+  .tbar { width: 100%; border-radius: 3px 3px 0 0; }
+  .tstub { width: 100%; height: 2px; background: #2c3346; }
+  .tnone { width: 100%; height: 100%; border: 1px dashed #232a38; border-radius: 3px; }
+  .tval { font-size: 10px; line-height: 12px; height: 12px; color: #c3cbd9; font-family: var(--mono); white-space: nowrap; }
+  .ttag { font-size: 10px; line-height: 12px; height: 12px; color: var(--warn); white-space: nowrap; }
+  .tdot { width: 5px; height: 5px; border-radius: 50%; background: var(--warn); margin-bottom: 2px; }
+  .tx { position: absolute; bottom: 10px; transform: translateX(-50%); font-size: 11px; color: var(--muted); }
+  .tempty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 13px; }
+  .tfoot { display: flex; gap: 16px; flex-wrap: wrap; font-size: 11.5px; color: var(--muted); margin-top: 10px; line-height: 1.7; }
+  .tfoot .tnote { flex: 1; min-width: 260px; }
+  .tlg { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+  .tlg i { display: inline-block; width: 9px; height: 9px; border-radius: 2px; }
+  .tlg i.ln { width: 12px; height: 0; border-top: 1px dashed #333b4f; }
+  .ttip { position: fixed; display: none; background: #10141d; border: 1px solid #38405a; border-radius: 10px;
+          padding: 10px 12px; font-size: 12px; font-family: var(--mono); color: #c3cbd9;
+          box-shadow: 0 8px 24px rgba(0,0,0,.5); z-index: 60; min-width: 250px; pointer-events: none; }
+  .ttip .tt { color: #e6e9f2; font-weight: 600; margin-bottom: 7px; }
+  .ttip .tr { display: flex; align-items: center; gap: 7px; line-height: 1.75; }
+  .ttip .tr i { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .ttip .tr span { flex: 1; }
+  .ttip .tr b { color: #e6e9f2; font-weight: 600; }
+  /* 页面级图例 */
   .tlegend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin: 10px 0 16px; }
   .tlegend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
   .tlegend .tln { display: inline-block; width: 14px; border-top: 1px dashed #333b4f; margin-right: 5px; vertical-align: 3px; }
-
-  /* 窄窗口：压缩名称列与柱间距，避免 7 根柱把行卡撑出横向滚动 */
   @media (max-width: 980px) {
-    .tk { flex: 0 1 150px; }
-    .tchart { gap: 8px; }
-    .tcol { width: 18px; }
-    .tcol .tbar, .tcol .tstub, .tcol .tnone { width: 18px; }
+    .tyaxis { width: 34px; }
+    .tsum { text-align: left; margin-left: 0; }
   }
 
   /* Modal */
@@ -342,6 +340,7 @@
     <span id="connTrend"><span class="dot"></span></span>
   </div>
   <div id="trendHint" class="hint"></div>
+  <div id="trendTip" class="ttip"></div>
   <div class="tlegend">
     <span><i style="background:var(--ok)"></i>&lt; 70%</span>
     <span><i style="background:var(--warn)"></i>70 – 90%</span>
@@ -1336,31 +1335,35 @@ function renderApi() {
 }
 
 /* ============================================================
- * v0.4.0 趋势页：每个 API Key 一行，近 7 日柱状图 + 右侧【更多】展开
+ * v0.4.0 趋势页：每个 AK 一张大图（纵向排列），每张图独立切区间
  * 数据源 = GET /api/trends（后端每次成功采集更新内存聚合、每小时落盘，见 internal/trend）
+ *
  * 口径（用户 260922 拍板）：
- *   非余额平台柱高 = 当日「5 小时额度峰值」——主口径，可精确复算、不引入外推；
- *                    hover 里附「当日增量 ≈x%（估计）」：跨窗口重置那一段无法测量。
- *   DeepSeek 柱高 = 当日实际消费（元）= 上一天末余额 − 当日本天末余额；
- *                  充值的日子差值为正 → 不出值，标「充值」；采样有缺口/起点不全同理。
- * 0.00 与「无采样」必须看得出区别：前者画细底线，后者画虚线空槽（「那天没用」≠「那天坏了」）。
+ *   非余额平台柱高 = 5 小时额度峰值（%）；DeepSeek 柱高 = 当日实际消费（元）
+ *   粒度：当日 = 24 小时柱；7 日 = 7 日柱；月度 = 近 30 日柱；季度 = 近 13 周柱；年度 = 近 12 月柱
+ *   0.00 与「无采样」必须可区分：0 → 2px 细底线；无采样 → 虚线空槽（后端给 null，不是 0）
+ *
+ * 为什么不引图表库：实测 @anvme/nanocharts 1.0.3 三件事都做不到 ——
+ *   ① colors 只按「序列」取色（单序列永远第一个色，做不了 severity 红黄绿）
+ *   ② 传 null 静默画成 1px 柱（「没采到」被当成「用了 0」，且不报错）
+ *   ③ tooltip 内容硬编码为「标签: 值」（写不进增量/采样数/源精度）
+ * 自绘的代价是约 150 行 JS，换来的是这三条口径不被降级。
  * ============================================================ */
 
 const TREND_RANGES = [
-  { key: 'day', label: '当日', hint: '今天 0-23 时（每小时一根）' },
-  { key: '7d', label: '7 日', hint: '近 7 天（每日一根）' },
-  { key: 'month', label: '月度', hint: '近 30 天（每日一根）' },
-  { key: 'quarter', label: '季度', hint: '近 13 周（每周一根，取该周峰值）' },
-  { key: 'year', label: '年度', hint: '近 12 个月（每月一根，取该月峰值）' },
+  { key: 'day', label: '当日', hint: '今天 0-23 时，每小时一根（该小时的 5 小时额度峰值）' },
+  { key: '7d', label: '7 日', hint: '近 7 天，每天一根（当日峰值）' },
+  { key: 'month', label: '月度', hint: '近 30 天，每天一根' },
+  { key: 'quarter', label: '季度', hint: '近 13 周，每周一根（取该周峰值）' },
+  { key: 'year', label: '年度', hint: '近 12 个月，每月一根（取该月峰值）' },
 ];
-const TREND_ROW_BAR_PX = 42;   // 行内柱高上限（百分比口径 = 100%）
-const TREND_BIG_BAR_PX = 155;  // 展开态柱高上限
+const TREND_PLOT_H = 380;   // 绘图区高
+const TREND_AXIS_H = 34;    // 轴行高（图区 = 380 + 34 = 414，外面还有 6px 余量）
 
 let trends = null;        // /api/trends 视图
 let trendsPromise = null; // 拉取中的 Promise（避免重复请求）
 let trendErr = '';
-let trendOpen = {};       // id → 是否展开
-let trendRange = {};      // id → 区间 key
+let trendRange = {};      // id → 区间 key（默认当日）
 
 // ensureTrends 确保趋势数据已加载（force = 显式刷新时重新拉取）。
 function ensureTrends(force) {
@@ -1372,7 +1375,6 @@ function ensureTrends(force) {
     .finally(() => { trendsPromise = null; });
   return trendsPromise;
 }
-
 function trendKeyOf(id) {
   if (!trends || !trends.keys) return null;
   return trends.keys.find(k => k.id === id) || null;
@@ -1382,30 +1384,67 @@ function trendKindOf(prov) {
   if (k && k.kind) return k.kind;
   return String(prov.id || '').split('.')[0] === 'deepseek' ? 'balance' : 'percent';
 }
-function trendRangeOf(id) { return trendRange[id] || '7d'; }
+function trendRangeOf(id) { return trendRange[id] || 'day'; }
 
-/* ---------- 日期工具（一律本地日期字符串，不用 toISOString：那是 UTC，会跨时区错一天） ---------- */
+/* ---------- 日期与数值工具（一律本地日期字符串：toISOString 是 UTC，会跨时区错一天） ---------- */
 function ymd(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
 function shiftDate(dateStr, delta) {
   const d = new Date(dateStr + 'T00:00:00');
   d.setDate(d.getDate() + delta);
   return ymd(d);
 }
-function trendToday() {
-  return (trends && trends.today) || ymd(new Date());
-}
+function trendToday() { return (trends && trends.today) || ymd(new Date()); }
 function lastNDates(n) {
   const t = trendToday();
   const out = [];
   for (let i = n - 1; i >= 0; i--) out.push(shiftDate(t, -i));
   return out;
 }
-function fmtMD(date) { return String(date || '').slice(5); }  // 2026-09-22 → 09-22
+function fmtMD(date) { return String(date || '').slice(5); }
 function fmtMoney(v) { return '￥' + (Number(v) || 0).toFixed(2); }
 function sumRound(arr) { return Math.round(arr.reduce((a, c) => a + c, 0) * 100) / 100; }
+function niceMax(v) {
+  const steps = [0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500, 1000];
+  for (const st of steps) if (v <= st) return st;
+  return Math.ceil(v / 1000) * 1000;
+}
+function tipAttr(t) { return esc(JSON.stringify(t)).replace(/'/g, '&#39;'); }
 
-/* ---------- 数据整形：区间 → 柱子序列 ---------- */
-// 序列元素：{ label, value(null = 无数据/不出值), note, title, gain, samples, today, topup }
+/* ---------- 序列构造：区间 → 柱子 ---------- */
+// 元素：{ label, value(数字|null), note, stub(0 值也有采样), topup, today, tip:{t,r} }
+function elemPercent(label, pm, today, extra) {
+  const v = pm && typeof pm.peak === 'number' ? pm.peak : null;
+  const rows = [];
+  if (extra) rows.push(extra);
+  if (pm && typeof pm.gain === 'number') rows.push(['增量 ≈', pm.gain.toFixed(2) + '%（估计）']);
+  rows.push(['采样', (pm ? pm.samples || 0 : 0) + ' 点']);
+  rows.push(['源精度', '整数 %']);
+  return {
+    label, value: v, stub: v === 0, today,
+    note: v === null ? '无采样' : '',
+    tip: {
+      t: `${label} · ${v === null ? '无采样' : '峰值 ' + v.toFixed(2) + '%'}`,
+      r: v === null ? [['原因', '该区间没有采到数据（进程没跑或采集失败）']] : rows,
+    },
+  };
+}
+function elemMoney(label, b, today) {
+  const last = b && typeof b.last === 'number' ? b.last : null;
+  const v = b && typeof b.spent === 'number' ? b.spent : null;
+  let note = '';
+  if (v === null && b) note = b.topup ? '充值' : (b.partial ? '起点不全' : '采样缺口');
+  return {
+    label, value: v, stub: v === 0, today, topup: !!(b && b.topup),
+    note: b ? note : '无采样',
+    tip: {
+      t: `${label} · ${v === null ? '不出值' + (note ? '（' + note + '）' : '') : '消费 ' + fmtMoney(v)}`,
+      r: b
+        ? [['日末余额', fmtMoney(last)], ['采样', (b.samples || 0) + ' 点'], ['源精度', '0.01 元']]
+        : [['原因', '该区间没有采到数据']],
+    },
+  };
+}
+
 function seriesOfDay(k, kind) {
   const today = trendToday();
   const hm = {};
@@ -1414,56 +1453,31 @@ function seriesOfDay(k, kind) {
   for (let hh = 0; hh < 24; hh++) {
     const slot = today + 'T' + pad2(hh);
     const h = hm[slot] || null;
-    const label = pad2(hh) + '时';
-    const isToday = true;
+    const label = pad2(hh) + ' 时';
     if (kind === 'balance') {
       const cur = h && typeof h.balance === 'number' ? h.balance : null;
       const prevSlot = hh > 0 ? today + 'T' + pad2(hh - 1) : shiftDate(today, -1) + 'T23';
       const ph = hm[prevSlot] || null;
       const prev = ph && typeof ph.balance === 'number' ? ph.balance : null;
-      let value = null, note = '';
+      let v = null, note = '';
       if (cur === null) note = '无采样';
       else if (prev === null) note = '无对比';
-      else if (prev - cur < 0) { value = 0; note = '充值'; }
-      else value = sumRound([prev - cur]);
+      else if (prev - cur < 0) { v = 0; note = '充值'; }
+      else v = sumRound([prev - cur]);
       out.push({
-        label, value, note, today: isToday,
-        title: cur === null
-          ? `${label} 无采样（该小时没采到余额）`
-          : `${label} 消费 ${value === null ? '—' : fmtMoney(value)} · 小时末余额 ${fmtMoney(cur)}${note === '充值' ? '（余额增加 = 充值，不记为消费）' : ''}`,
+        label, value: v, stub: v === 0, today: true, topup: note === '充值', note,
+        tip: {
+          t: `${label} · ${v === null ? '不出值' + (note ? '（' + note + '）' : '') : '消费 ' + fmtMoney(v)}`,
+          r: cur === null
+            ? [['原因', '该小时没有采到余额']]
+            : [['小时末余额', fmtMoney(cur)], ['上一小时末', prev === null ? '—' : fmtMoney(prev)], ['源精度', '0.01 元']],
+        },
       });
     } else {
-      const pm = h && h.pct ? h.pct : null;
-      const value = pm && typeof pm.peak === 'number' ? pm.peak : null;
-      out.push({
-        label, value, note: value === null ? '无采样' : '', gain: pm ? pm.gain : null, samples: pm ? pm.samples : 0, today: isToday,
-        title: value === null
-          ? `${label} 无采样（该小时没采到数据）`
-          : `${label} 峰值 ${value.toFixed(2)}% · 采样 ${pm.samples} 点`,
-      });
+      out.push(elemPercent(label, h && h.pct, true));
     }
   }
   return out;
-}
-
-function dayElement(kind, d, label) {
-  if (!d) return { label, value: null, note: '无采样', title: `${label} 无采样（进程没跑或采集失败）` };
-  if (kind === 'balance') {
-    const b = d.balance || {};
-    const value = typeof b.spent === 'number' ? b.spent : null;
-    let note = '';
-    if (value === null) note = b.topup ? '充值' : (b.partial ? '起点不全' : (d.gaps ? '采样缺口' : '无值'));
-    return {
-      label, value, note, topup: !!b.topup, samples: d.samples, gaps: d.gaps,
-      title: `${label} ${value === null ? '不出值（' + note + '）' : '消费 ' + fmtMoney(value)} · 日末余额 ${fmtMoney(b.last)} · 采样 ${d.samples} 点${d.gaps ? ' · 缺口 ' + d.gaps + ' 次' : ''}`,
-    };
-  }
-  const pm = d.pct || {};
-  const value = typeof pm.peak === 'number' ? pm.peak : null;
-  return {
-    label, value, note: value === null ? '无采样' : '', gain: pm.gain, samples: pm.samples, gaps: d.gaps,
-    title: `${label} 峰值 ${value === null ? '—' : value.toFixed(2) + '%'} · 当日增量 ≈${Number(pm.gain || 0).toFixed(2)}%（估计） · 采样 ${pm.samples || 0} 点`,
-  };
 }
 
 function seriesOfDays(k, kind, n) {
@@ -1471,13 +1485,20 @@ function seriesOfDays(k, kind, n) {
   for (const d of (k && k.daily) || []) if (d) byDate[d.date] = d;
   const dates = lastNDates(n);
   return dates.map((date, i) => {
-    const el = dayElement(kind, byDate[date], fmtMD(date));
-    el.today = i === dates.length - 1;
-    return el;
+    const d = byDate[date];
+    const today = i === dates.length - 1;
+    if (!d) {
+      return {
+        label: fmtMD(date), value: null, today, note: '无采样',
+        tip: { t: `${fmtMD(date)} · 无采样`, r: [['原因', '这一天没有采到数据（进程没跑或采集失败）']] },
+      };
+    }
+    if (kind === 'balance') return elemMoney(fmtMD(date), d.balance || null, today);
+    return elemPercent(fmtMD(date), d.pct, today);
   });
 }
 
-// 周/月聚合：额度取「区间内峰值」，金额取「区间内消费合计」。
+// 周/月聚合：额度取区间峰值，金额取区间合计（金额可加，百分比不可加 —— 所以百分比取峰值不取和）。
 function seriesOfBuckets(k, kind, mode) {
   const buckets = [];
   const idx = {};
@@ -1486,14 +1507,17 @@ function seriesOfBuckets(k, kind, mode) {
     let key, label;
     if (mode === 'week') {
       const dt = new Date(d.date + 'T00:00:00');
-      dt.setDate(dt.getDate() - ((dt.getDay() + 6) % 7)); // 周一为界
+      dt.setDate(dt.getDate() - ((dt.getDay() + 6) % 7));   // 周一为界
       key = ymd(dt);
-      label = fmtMD(key);
+      label = fmtMD(key) + ' 周';
     } else {
       key = d.date.slice(0, 7);
-      label = Number(key.slice(5)) + '月';
+      label = Number(key.slice(5)) + ' 月';
     }
-    if (idx[key] === undefined) { idx[key] = buckets.length; buckets.push({ key, label, peaks: [], gains: 0, sums: [], days: 0, bad: 0, samples: 0 }); }
+    if (idx[key] === undefined) {
+      idx[key] = buckets.length;
+      buckets.push({ key, label, peaks: [], gains: 0, sums: [], days: 0, bad: 0, samples: 0 });
+    }
     const b = buckets[idx[key]];
     b.days++;
     b.samples += d.samples || 0;
@@ -1504,17 +1528,27 @@ function seriesOfBuckets(k, kind, mode) {
   }
   const keep = buckets.slice(mode === 'week' ? -13 : -12);
   return keep.map(b => {
+    const today = false;
     if (kind === 'balance') {
-      const value = b.sums.length ? sumRound(b.sums) : null;
+      const v = b.sums.length ? sumRound(b.sums) : null;
       return {
-        label: b.label, value, note: value === null ? '无值' : '', samples: b.samples,
-        title: `${b.label} 消费 ${value === null ? '不出值' : fmtMoney(value)} · 有值 ${b.sums.length}/${b.days} 天 · 采样 ${b.samples} 点${b.bad ? ' · ' + b.bad + ' 天数据不完整' : ''}`,
+        label: b.label, value: v, stub: v === 0, today,
+        tip: {
+          t: `${b.label} · ${v === null ? '不出值' : '合计 ' + fmtMoney(v)}`,
+          r: [['有值天数', `${b.sums.length}/${b.days} 天`], ['采样合计', b.samples + ' 点'],
+              ['数据完整度', b.bad ? `${b.bad} 天有缺口/起点不全` : '完整']],
+        },
       };
     }
-    const value = b.peaks.length ? Math.max(...b.peaks) : null;
+    const v = b.peaks.length ? Math.max(...b.peaks) : null;
     return {
-      label: b.label, value, note: value === null ? '无采样' : '', samples: b.samples,
-      title: `${b.label} 峰值 ${value === null ? '—' : value.toFixed(2) + '%'} · 增量 ≈${b.gains.toFixed(2)}% · 有值 ${b.peaks.length}/${b.days} 天${b.bad ? ' · ' + b.bad + ' 天数据不完整' : ''}`,
+      label: b.label, value: v, stub: v === 0, today,
+      note: v === null ? '无采样' : '',
+      tip: {
+        t: `${b.label} · ${v === null ? '无采样' : '峰值 ' + v.toFixed(2) + '%'}`,
+        r: [['增量合计 ≈', b.gains.toFixed(2) + '%（估计）'], ['有值天数', `${b.peaks.length}/${b.days} 天`],
+            ['采样合计', b.samples + ' 点'], ['源精度', '整数 %']],
+      },
     };
   });
 }
@@ -1527,49 +1561,73 @@ function seriesOf(k, kind, range) {
     case 'quarter': return seriesOfBuckets(k, kind, 'week');
     case 'year': return seriesOfBuckets(k, kind, 'month');
   }
-  return seriesOfDays(k, kind, 7);
-}
-
-// trendScale 百分比口径固定 0-100（比例本身有含义）；金额口径按区间最大值（否则几十块钱会画成贴地线）。
-function trendScale(kind, series) {
-  if (kind !== 'balance') return 100;
-  const vals = series.map(s => (typeof s.value === 'number' ? s.value : 0));
-  const mx = Math.max(0, ...vals);
-  return mx > 0 ? mx : 1;
+  return seriesOfDay(k, kind);
 }
 
 /* ---------- 渲染 ---------- */
-function trendBars(series, kind, big) {
-  const scale = trendScale(kind, series);
-  const maxPx = big ? TREND_BIG_BAR_PX : TREND_ROW_BAR_PX;
-  return series.map(s => {
-    const cls = big ? 'bcol' : 'tcol';
-    const valCls = big ? 'bval' : 'tval';
-    const barCls = big ? 'bbar' : 'tbar';
-    const rgCls = big ? 'brg' : 'trg';
-    const rg = `<div class="${rgCls}${s.today ? ' today' : ''}">${esc(s.label || '')}</div>`;
-    const v = typeof s.value === 'number' ? s.value : null;
-    const tag = s.topup ? `<div class="ttag" title="当日余额增加 = 有充值，消费不出值">${big ? '↑充值' : '充值'}</div>` : '';
-    if (v === null) {
-      const slotTxt = big && s.note && s.note !== '无采样' ? s.note : '—';
-      return `<div class="${cls}">${tag}<div class="${big ? 'bnone' : 'tnone'}" title="${esc(s.title || '')}">${esc(slotTxt)}</div>${rg}</div>`;
-    }
-    if (!(v > 0)) {
-      const stub = big
-        ? `<div class="${barCls}" style="height:2px;background:#2c3346" title="${esc(s.title || '')}"></div>`
-        : `<div class="tstub" title="${esc(s.title || '')}"></div>`;
-      return `<div class="${cls}">${tag}${stub}${rg}</div>`;
-    }
-    const h = Math.max(2, Math.round(v / scale * maxPx * 10) / 10);
-    const color = kind === 'balance' ? 'var(--accent)' : sevColor(slotSeverity(v, undefined));
-    return `<div class="${cls}">
-      <div class="${valCls}">${v.toFixed(2)}</div>
-      <div class="${barCls}" style="height:${h}px;background:${color}" title="${esc(s.title || '')}"></div>
-      ${rg}</div>`;
-  }).join('');
+function trendScale(kind, series) {
+  if (kind !== 'balance') return 100;   // 百分比固定 0-100：可跨卡比较，也不夸大 26% 这种值
+  const mx = Math.max(0, ...series.map(s => (typeof s.value === 'number' ? s.value : 0)));
+  return niceMax(mx);
+}
+function tickText(kind, v) {
+  return kind === 'balance' ? (v >= 10 ? String(Math.round(v)) : v.toFixed(1)) : Math.round(v) + '%';
 }
 
-// trendSubLine 行首副行：直接复用首页卡片的口径（周/月用量或账户余额），保证两页数字同源。
+function trendChartHtml(kind, series, unit) {
+  const scale = trendScale(kind, series);
+  const ticks = [25, 50, 75, 100];
+  const yaxis = ticks.map(tk =>
+    `<span style="bottom:${Math.round(TREND_PLOT_H * tk / 100) + TREND_AXIS_H}px">${tickText(kind, scale * tk / 100)}</span>`).join('')
+    + `<span class="tunit">${esc(unit)}</span>`;
+  const grid = ticks.map(tk =>
+    `<div class="tgridline" style="bottom:${Math.round(TREND_PLOT_H * tk / 100) + TREND_AXIS_H}px"></div>`).join('');
+  const ref = kind === 'percent' ? `<div class="tthrow" style="bottom:${TREND_AXIS_H}px"></div>` : '';
+  const hasAny = series.some(s => s.value !== null || s.stub);
+  const cols = series.map(s => {
+    const v = typeof s.value === 'number' ? s.value : null;
+    const tag = s.topup ? `<span class="${series.length > 31 ? 'tdot' : 'ttag'}">${series.length > 31 ? '' : '充值'}</span>` : '';
+    const tip = `data-tip='${tipAttr(s.tip)}'`;
+    if (v === null) {
+      return `<div class="tcol">${tag}<div class="tnone" ${tip}></div><div class="tval">—</div></div>`;
+    }
+    if (!(v > 0)) {
+      return `<div class="tcol">${tag}<div class="tstub" ${tip}></div><div class="tval">0.00</div></div>`;
+    }
+    const px = Math.max(2, Math.round(v / scale * TREND_PLOT_H * 10) / 10);
+    const color = kind === 'balance' ? 'var(--accent)' : sevColor(slotSeverity(v, undefined));
+    return `<div class="tcol">${tag}<div class="tval">${v.toFixed(2)}</div>
+      <div class="tbar" style="height:${px}px;background:${color}" ${tip}></div></div>`;
+  }).join('');
+  // 横轴：最多 8 个标签
+  const step = Math.max(1, Math.ceil(series.length / 8));
+  const xs = series.map((s, i) => (i % step === 0
+    ? `<div class="tx" style="left:${((i + 0.5) / series.length * 100).toFixed(3)}%">${esc(s.label)}</div>` : '')).join('');
+  const empty = hasAny ? '' : '<div class="tempty">该区间暂无采样数据</div>';
+  return `<div class="twrap">
+    <div class="tyaxis">${yaxis}</div>
+    <div class="tplot">${grid}${ref}
+      <div class="tcols" style="bottom:${TREND_AXIS_H}px;height:${TREND_PLOT_H}px">${cols}</div>
+      ${xs}${empty}
+    </div>
+  </div>`;
+}
+
+function trendStatsHtml(k, kind, series, range) {
+  const rh = TREND_RANGES.find(r => r.key === range) || TREND_RANGES[0];
+  const nums = series.filter(s => typeof s.value === 'number').map(s => s.value);
+  if (!k || !nums.length) return `区间 <b>${esc(rh.label)}</b><br>暂无数据`;
+  const samples = series.reduce((a, s) => a + (s.samples || 0), 0);
+  if (kind === 'balance') {
+    const total = sumRound(nums);
+    return `区间 <b>${esc(rh.label)}</b> · 合计 <b>${fmtMoney(total)}</b><br>有值 <b>${nums.length}</b>/${series.length} 根 · 起点 <b>${esc(k.first_day || '—')}</b><br>源精度 <b>0.01 元</b>`;
+  }
+  const peak = Math.max(...nums);
+  const mean = Math.round(nums.reduce((a, c) => a + c, 0) / nums.length * 100) / 100;
+  return `区间 <b>${esc(rh.label)}</b> · 峰值 <b>${peak.toFixed(2)}%</b><br>均值 <b>${mean.toFixed(2)}%</b> · 采样 <b>${samples.toLocaleString()}</b> 点<br>数据起点 <b>${esc(k.first_day || '—')}</b> · 源精度 <b>整数 %</b>`;
+}
+
+// trendSubLine 卡头副行：复用首页卡片的口径（周/月用量或账户余额），两页数字同源。
 function trendSubLine(prov) {
   if (!prov || prov.data === null || prov.data === undefined) return '';
   const items = extractQuotaItems(prov);
@@ -1584,94 +1642,46 @@ function trendSubLine(prov) {
   return parts.join(' · ');
 }
 
-function trendUnitLabel(kind) {
-  return kind === 'balance' ? '当日消费（元）' : '5 小时额度峰值（%）';
-}
-
-function trendRowHtml(prov, k) {
-  const kind = trendKindOf(prov);
-  const series = k ? seriesOfDays(k, kind, 7) : seriesOfDays(null, kind, 7);
-  const hasData = k && k.total_days > 0;
-  const sub = trendSubLine(prov) || (hasData ? '' : '尚无趋势数据');
-  const lines = kind === 'percent'
-    ? '<div class="tbase"></div><div class="t100"></div>'
-    : '<div class="tbase"></div>';
-  return `<div class="trow">
-    <div class="tk">
-      <div class="nm">${esc(prov.name)}</div>
-      <div class="sub">${esc(sub) || '&nbsp;'}</div>
-      <div class="unit">${esc(trendUnitLabel(kind))}${hasData ? ' · 已有 ' + k.total_days + ' 天' : ''}</div>
-    </div>
-    <div class="tchart">${lines}${trendBars(series, kind, false)}</div>
-    <div class="tmore"><a data-tmore="${esc(prov.id)}">更多 ›</a><span class="thint">当日 / 月 / 季 / 年</span></div>
-  </div>`;
-}
-
-function trendStatsHtml(k, kind, series, range) {
-  const vals = series.filter(s => typeof s.value === 'number').map(s => s.value);
-  const rh = TREND_RANGES.find(r => r.key === range) || TREND_RANGES[1];
-  if (!k || !vals.length) {
-    return `区间 <b>${esc(rh.label)}</b><br>该区间暂无数据`;
-  }
-  const samples = series.reduce((a, s) => a + (s.samples || 0), 0);
-  const first = vals.length ? series.filter(s => typeof s.value === 'number')[0].label : '—';
-  if (kind === 'balance') {
-    const total = sumRound(series.filter(s => typeof s.value === 'number').map(s => s.value));
-    return `区间 <b>${esc(rh.label)}</b> · 合计 <b>${fmtMoney(total)}</b><br>有值 <b>${vals.length}</b>/${series.length} 根 · 起始 ${esc(k.first_day || '—')}<br>源精度 <b>0.01 元</b>（接口给的余额字符串）`;
-  }
-  const peak = Math.max(...vals);
-  const mean = Math.round(vals.reduce((a, c) => a + c, 0) / vals.length * 100) / 100;
-  return `区间峰值 <b>${peak.toFixed(2)}%</b><br>均值 <b>${mean.toFixed(2)}%</b> · 采样合计 <b>${samples.toLocaleString()}</b> 点<br>数据起点 <b>${esc(k.first_day || '—')}</b> · 源精度 <b>整数 %</b>`;
-}
-
-function trendFootNote(kind, range) {
-  if (kind === 'balance') {
-    return '柱高 = 当日实际消费（上一天/上一小时末余额 − 当日末余额）。充值的日子差值为正，出一根细底线并标「充值」；' +
-      '采样有缺口或起点不全（进程中途启动）时首尾差不等于当日消费，柱子画成虚线空槽并在悬停说明里写原因 —— 宁可不给值，也不给一个错的数。';
-  }
-  return '柱高 = 当日的「5 小时额度峰值」（主口径，可精确复算）。悬停可看当日增量估计 ≈（相邻样本增幅之和，跨窗口重置的那一段无法测量，是下限）。' +
-    '5 小时额度是重置型窗口，空闲日天然是 0，所以柱状图回答的是「那天最紧到过多少」，不是「那天消耗了多少」。' +
-    (range === 'year' || range === 'quarter' ? '本周/月柱取区间内峰值。' : '');
-}
-
-function trendExpandedHtml(prov, k) {
+function trendCardHtml(prov, k) {
   const kind = trendKindOf(prov);
   const range = trendRangeOf(prov.id);
   const series = seriesOf(k, kind, range);
   const segs = TREND_RANGES.map(r =>
     `<button data-tseg="${r.key}" data-tid="${esc(prov.id)}" title="${esc(r.hint)}" class="${r.key === range ? 'active' : ''}">${r.label}</button>`).join('');
-  const base = kind === 'percent'
-    ? '<div class="tbase2"></div><div class="t100b"></div><div class="tylab" style="bottom:165px">100%</div><div class="tylab" style="bottom:92px">50%</div>'
-    : '<div class="tbase2"></div>';
-  const gap = series.length > 14 ? 8 : 20;
-  return `<div class="texpand">
-    <div class="ttop">
-      <div class="nm">${esc(prov.name)}</div>
+  const unit = kind === 'balance' ? '元' : '%';
+  const hasData = !!(k && k.total_days > 0);
+  const note = kind === 'balance'
+    ? '柱高 = 该区间的实际消费（相邻余额快照之差）。充值的时段不出值，标「充值」；采样有缺口或起点不全时首尾差不等于真实消费，画成虚线空槽 —— 宁可不给值，也不给一个错的数。'
+    : '柱高 = 该区间的「5 小时额度峰值」（可精确复算）。5 小时额度是重置型窗口，空闲时段天然是 0；虚线空槽 = 那个时段没采到数据（不是 0）。';
+  return `<div class="tcard">
+    <div class="thead">
+      <div class="tname">${esc(prov.name)}<span class="tsub">${esc(trendSubLine(prov)) || (hasData ? '&nbsp;' : '尚无趋势数据')}</span></div>
       <div class="tseg">${segs}</div>
       <div class="tsum">${trendStatsHtml(k, kind, series, range)}</div>
     </div>
-    <div class="tbig" style="gap:${gap}px">${base}${trendBars(series, kind, true)}</div>
-    <div class="tfoot">${trendFootNote(kind, range)}
-      <a data-tmore="${esc(prov.id)}" style="color:var(--accent);cursor:pointer;margin-left:8px;border-bottom:1px solid rgba(79,124,255,.35)">收起 ‹</a>
+    ${trendChartHtml(kind, series, unit)}
+    <div class="tfoot">
+      <span class="tnote">${esc(note)}</span>
+      ${hasData ? `<span class="tlg">数据起点 ${esc(k.first_day || '—')}</span>` : ''}
     </div>
   </div>`;
 }
 
 function renderTrendHint(provs) {
   const el = $('#trendHint');
-  const avail = provs.map(p => { const k = trendKeyOf(p.id); return k ? k.total_days : 0; });
-  const maxDays = avail.length ? Math.max(...avail) : 0;
+  if (!el) return;
   if (trendErr) {
     el.innerHTML = `趋势数据加载失败（${esc(trendErr)}）——「总览」与「接口」仍可正常使用；点右上角「刷新」重试。`;
     return;
   }
+  const days = provs.map(p => { const k = trendKeyOf(p.id); return k ? k.total_days : 0; });
+  const maxDays = days.length ? Math.max(...days) : 0;
   if (!maxDays) {
-    el.innerHTML = '趋势数据从首次采集开始积累：上游接口只给当前值、不给历史，所以这里补不回过去。服务没运行的时段记为「无采样」（虚线空槽），不会画成 0.00%；' +
-      '采集正常时，当日视图立刻可用，7 日在 7 天后、月/季/年依次在 30 / 90 / 365 天后才完整。';
+    el.innerHTML = '趋势数据从首次采集开始积累：上游接口只给当前值、不给历史，所以这里补不回过去。'
+      + '服务没运行的时段记为「无采样」（虚线空槽），不会画成 0.00%。当日视图在首个采集周期后即可用，7 日 / 月度 / 季度 / 年度依次在 7 / 30 / 90 / 365 天后才完整。';
     return;
   }
-  el.innerHTML = `已积累 <b>${maxDays}</b> 天趋势数据（每 ${esc(String((cfgView && cfgView.collector && cfgView.collector.interval_base_s) || 300))}s 采集、每小时落盘一次）。` +
-    '柱高口径：非余额平台 = 当日 5 小时额度峰值；DeepSeek = 当日实际消费（元）。';
+  el.innerHTML = `已积累 <b>${maxDays}</b> 天趋势数据。每张图可独立切区间：当日按小时、7 日与月度按天、季度按周、年度按月。`;
 }
 
 function renderTrend() {
@@ -1688,26 +1698,72 @@ function renderTrend() {
     setConn('trend', '', all.length ? `${disabledCount} 个平台全部已停用` : '无数据');
     return;
   }
-  box.innerHTML = provs.map(prov => {
-    const k = trendKeyOf(prov.id);
-    return trendOpen[prov.id] ? trendExpandedHtml(prov, k) : trendRowHtml(prov, k);
-  }).join('');
-  box.querySelectorAll('[data-tmore]').forEach(el => {
-    el.onclick = () => {
-      const id = el.dataset.tmore;
-      trendOpen[id] = !trendOpen[id];
+  box.innerHTML = provs.map(prov => trendCardHtml(prov, trendKeyOf(prov.id))).join('');
+  if (!box.dataset.bound) {
+    box.dataset.bound = '1';
+    box.addEventListener('click', e => {
+      const btn = e.target.closest('[data-tseg]');
+      if (!btn) return;
+      trendRange[btn.dataset.tid] = btn.dataset.tseg;
       renderTrend();
-    };
-  });
-  box.querySelectorAll('[data-tseg]').forEach(el => {
-    el.onclick = () => {
-      trendRange[el.dataset.tid] = el.dataset.tseg;
-      renderTrend();
-    };
-  });
+    });
+    box.addEventListener('mouseover', e => {
+      const el = e.target.closest('[data-tip]');
+      if (el) showTrendTip(el, e);
+    });
+    box.addEventListener('mousemove', e => {
+      const el = e.target.closest('[data-tip]');
+      if (el) positionTrendTip(e);
+    });
+    box.addEventListener('mouseout', e => {
+      if (e.target.closest('[data-tip]')) hideTrendTip();
+    });
+  }
   const withData = provs.filter(p => { const k = trendKeyOf(p.id); return k && k.total_days > 0; }).length;
   setConn('trend', withData ? 'ok' : (trendErr ? 'err' : 'wait'),
     `${withData}/${provs.length} 个 API Key 已有趋势数据` + (disabledCount ? `（${disabledCount} 个已停用，未显示）` : ''));
+}
+
+/* ---------- 悬停明细（自绘：内容要带增量/采样数/源精度，原生 title 放不下多行） ---------- */
+function showTrendTip(el, ev) {
+  let tip;
+  try { tip = JSON.parse(el.dataset.tip); } catch (e) { return; }
+  const box = $('#trendTip');
+  if (!box || !tip) return;
+  box.innerHTML = '';
+  const t = document.createElement('div');
+  t.className = 'tt';
+  t.textContent = tip.t || '';
+  box.appendChild(t);
+  for (const row of tip.r || []) {
+    const d = document.createElement('div');
+    d.className = 'tr';
+    const dot = document.createElement('i');
+    dot.style.background = 'var(--accent)';
+    const k = document.createElement('span');
+    k.textContent = row[0];
+    const v = document.createElement('b');
+    v.textContent = row[1];
+    d.append(dot, k, v);
+    box.appendChild(d);
+  }
+  box.style.display = 'block';
+  positionTrendTip(ev);
+}
+function positionTrendTip(ev) {
+  const box = $('#trendTip');
+  if (!box || box.style.display !== 'block') return;
+  const pad = 14;
+  const w = box.offsetWidth, h = box.offsetHeight;
+  let x = ev.clientX + pad, y = ev.clientY + pad;
+  if (x + w > window.innerWidth - 8) x = ev.clientX - w - pad;
+  if (y + h > window.innerHeight - 8) y = ev.clientY - h - pad;
+  box.style.left = Math.max(8, x) + 'px';
+  box.style.top = Math.max(8, y) + 'px';
+}
+function hideTrendTip() {
+  const box = $('#trendTip');
+  if (box) box.style.display = 'none';
 }
 
 // trendDaysOf 供「删除确认」提示用：该 Key 已有多少天趋势数据（未加载返回 null）。
