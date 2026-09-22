@@ -198,11 +198,11 @@
   .tseg { margin-left: auto; flex: none; display: flex; gap: 3px; background: var(--card2); border: 1px solid var(--border); border-radius: 9px; padding: 2px; }
   .tseg button { background: none; border: none; color: var(--muted); padding: 4px 9px; border-radius: 6px; font-size: 12px; }
   .tseg button.active { background: var(--accent); color: #fff; }
-  .twrap { display: flex; gap: 8px; height: 188px; flex: none; margin-top: 6px; }
-  .tyaxis { width: 40px; flex: none; position: relative; height: 188px; }
+  .twrap { display: flex; gap: 8px; height: 210px; flex: none; margin-top: 6px; }
+  .tyaxis { width: 40px; flex: none; position: relative; height: 210px; }
   .tyaxis span { position: absolute; right: 4px; transform: translateY(50%); font-size: 10px; color: #6f778a; font-family: var(--mono); }
   .tyaxis span.tunit { bottom: 4px; right: 6px; transform: none; }
-  .tplot { position: relative; flex: 1; min-width: 0; height: 188px; }
+  .tplot { position: relative; flex: 1; min-width: 0; height: 210px; }
   /* 悬停指示带：鼠标在绘图区里按 x 对齐到对应时段（不要求压在柱子上），手感对齐图表插件 */
   .tband { position: absolute; display: none; background: rgba(255,255,255,.05); border-radius: 3px; pointer-events: none; }
   .tcol.hov .tbar { box-shadow: 0 0 0 1px rgba(255,255,255,.22); }
@@ -217,7 +217,7 @@
   .tzero { width: 100%; height: 4px; background: transparent; }
   /* 无采样：**不**逐列画虚线框 —— 相邻列的框顶边会在同一条水平线上连成假网格线（实测 12 列全在 top:12px），
      改成把连续的无采样时段合并成一条淡色区段（见 paintNoSampleRuns）。列本身只留悬停命中。 */
-  .tnrun { position: absolute; top: 0; height: 166px; background: rgba(255,255,255,.028);
+  .tnrun { position: absolute; top: 0; height: 188px; background: rgba(255,255,255,.028);
            border-left: 1px dashed #2b3244; border-right: 1px dashed #2b3244; border-radius: 3px; pointer-events: none; }
   .tval { font-size: 9.5px; line-height: 11px; height: 11px; color: #c3cbd9; font-family: var(--mono); white-space: nowrap; }
   .tval.pk { color: #e6e9f2; font-weight: 600; }
@@ -225,17 +225,15 @@
   .tdot { width: 4px; height: 4px; border-radius: 50%; background: var(--warn); margin-bottom: 1px; }
   .tx { position: absolute; bottom: 5px; transform: translateX(-50%); font-size: 10px; color: var(--muted); }
   .tempty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 12.5px; }
-  .tfoot { flex: none; margin-top: 6px; height: 16px; font-size: 11.5px; color: var(--muted); font-family: var(--mono);
-           white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .tfoot b { color: #c3cbd9; }
   /* 页面级图例 */
   .tlegend { display: flex; gap: 18px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin: 10px 0 14px; }
   .tlegend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
   .tlegend .tln { display: inline-block; width: 14px; border-top: 1px dashed #333b4f; margin-right: 5px; vertical-align: 3px; }
   .ttip { position: fixed; display: none; background: #10141d; border: 1px solid #38405a; border-radius: 10px;
           padding: 9px 11px; font-size: 12px; font-family: var(--mono); color: #c3cbd9;
-          box-shadow: 0 8px 24px rgba(0,0,0,.5); z-index: 60; min-width: 240px; pointer-events: none; }
-  .ttip .tt { color: #e6e9f2; font-weight: 600; margin-bottom: 6px; }
+          box-shadow: 0 8px 24px rgba(0,0,0,.5); z-index: 60; pointer-events: none; }
+  .ttip .tt { color: #e6e9f2; font-weight: 600; white-space: nowrap; }
+  .ttip .tr:empty { display: none; }
   .ttip .tr { display: flex; align-items: center; gap: 7px; line-height: 1.7; }
   .ttip .tr i { width: 9px; height: 9px; border-radius: 50%; flex: none; }
   .ttip .tr span { flex: 1; }
@@ -1360,9 +1358,9 @@ const TREND_RANGES = [
   { key: 'quarter', label: '季度', hint: '近 13 周，每周一根（取该周峰值）' },
   { key: 'year', label: '年度', hint: '近 12 个月，每月一根（取该月峰值）' },
 ];
-const TREND_PLOT_H = 188;   // 图区高（卡高 268 = 12+30+6+188+6+16+10）
+const TREND_PLOT_H = 210;   // 图区高（卡高 268 = 12+30+6+210+10；卡脚摘要已按用户要求删掉）
 const TREND_AXIS_H = 22;    // 轴行高
-const TREND_BAR_H = 154;    // 柱高上限（= 100%）；188 − 22 − 154 = 12px 留给柱顶数字
+const TREND_BAR_H = 176;    // 柱高上限（= 100%）；210 − 22（轴行）− 12（柱顶数字留白）= 176
 
 let trends = null;        // /api/trends 视图
 let trendsPromise = null; // 拉取中的 Promise（避免重复请求）
@@ -1423,18 +1421,12 @@ function tipAttr(t) { return esc(JSON.stringify(t)).replace(/'/g, '&#39;'); }
 function elemPercent(label, pm, today) {
   const usage = pm && typeof pm.gain === 'number' ? pm.gain : null;
   const peak = pm && typeof pm.peak === 'number' ? pm.peak : null;
-  const rows = [];
-  if (peak !== null) rows.push(['该时段峰值', peak.toFixed(2) + '%']);
-  rows.push(['采样', (pm ? pm.samples || 0 : 0) + ' 点']);
-  if (pm && pm.resets) rows.push(['窗口重置', pm.resets + ' 次（重置前那段已按 (100−上次)+本次 补回）']);
-  rows.push(['源精度', '整数 %']);
+  // 悬停只给「时间：数据」（用户 260922：其余数据没必要）；峰值/采样/重置次数只用于柱高口径核对，
+  // 需要时从 trends.json 里看，不占悬停面板。
   return {
     label, value: usage, peak, samples: pm ? (pm.samples || 0) : 0, stub: usage === 0, today,
     note: usage === null ? '无采样' : '',
-    tip: {
-      t: `${label} · ${usage === null ? '无采样' : '用量 ' + usage.toFixed(2) + '%'}`,
-      r: usage === null ? [['原因', '该时段没有采到数据（进程没跑或采集失败）']] : rows,
-    },
+    tip: { t: `${label}：${usage === null ? '无采样' : usage.toFixed(2) + '%'}`, r: [] },
   };
 }
 function elemMoney(label, b, today) {
@@ -1446,10 +1438,8 @@ function elemMoney(label, b, today) {
     label, value: v, stub: v === 0, today, topup: !!(b && b.topup),
     note: b ? note : '无采样',
     tip: {
-      t: `${label} · ${v === null ? '不出值' + (note ? '（' + note + '）' : '') : '消费 ' + fmtMoney(v)}`,
-      r: b
-        ? [['日末余额', fmtMoney(last)], ['采样', (b.samples || 0) + ' 点'], ['源精度', '0.01 元']]
-        : [['原因', '该区间没有采到数据']],
+      t: `${label}：${v === null ? (note || '无采样') : fmtMoney(v)}`,
+      r: [],
     },
   };
 }
@@ -1475,12 +1465,7 @@ function seriesOfDay(k, kind) {
       else v = sumRound([prev - cur]);
       out.push({
         label, value: v, stub: v === 0, today: true, topup: note === '充值', note,
-        tip: {
-          t: `${label} · ${v === null ? '不出值' + (note ? '（' + note + '）' : '') : '消费 ' + fmtMoney(v)}`,
-          r: cur === null
-            ? [['原因', '该小时没有采到余额']]
-            : [['小时末余额', fmtMoney(cur)], ['上一小时末', prev === null ? '—' : fmtMoney(prev)], ['源精度', '0.01 元']],
-        },
+        tip: { t: `${label}：${v === null ? (note || '无采样') : fmtMoney(v)}`, r: [] },
       });
     } else {
       out.push(elemPercent(label, h && h.pct, true));
@@ -1499,7 +1484,7 @@ function seriesOfDays(k, kind, n) {
     if (!d) {
       return {
         label: fmtMD(date), value: null, today, note: '无采样',
-        tip: { t: `${fmtMD(date)} · 无采样`, r: [['原因', '这一天没有采到数据（进程没跑或采集失败）']] },
+        tip: { t: `${fmtMD(date)}：无采样`, r: [] },
       };
     }
     if (kind === 'balance') return elemMoney(fmtMD(date), d.balance || null, today);
@@ -1542,11 +1527,7 @@ function seriesOfBuckets(k, kind, mode) {
       const v = b.sums.length ? sumRound(b.sums) : null;
       return {
         label: b.label, value: v, stub: v === 0, today,
-        tip: {
-          t: `${b.label} · ${v === null ? '不出值' : '合计 ' + fmtMoney(v)}`,
-          r: [['有值天数', `${b.sums.length}/${b.days} 天`], ['采样合计', b.samples + ' 点'],
-              ['数据完整度', b.bad ? `${b.bad} 天有缺口/起点不全` : '完整']],
-        },
+        tip: { t: `${b.label}：${v === null ? '无采样' : fmtMoney(v)}`, r: [] },
       };
     }
     // 用量是可加量（百分点），所以周/月取合计；峰值另列在悬停里
@@ -1555,12 +1536,7 @@ function seriesOfBuckets(k, kind, mode) {
     return {
       label: b.label, value: v, peak, samples: b.samples, stub: v === 0, today,
       note: v === null ? '无采样' : '',
-      tip: {
-        t: `${b.label} · ${v === null ? '无采样' : '用量 ' + v.toFixed(2) + '%'}`,
-        r: [['区间峰值', peak === null ? '—' : peak.toFixed(2) + '%'],
-            ['有值天数', `${b.peaks.length}/${b.days} 天`],
-            ['采样合计', b.samples + ' 点'], ['源精度', '整数 %']],
-      },
+      tip: { t: `${b.label}：${v === null ? '无采样' : v.toFixed(2) + '%'}`, r: [] },
     };
   });
 }
@@ -1643,21 +1619,6 @@ function trendChartHtml(kind, series, unit) {
   </div>`;
 }
 
-// trendFootHtml 卡脚单行摘要（卡高 268 放不下多行；口径说明进卡片 title）
-function trendFootHtml(k, kind, series, range) {
-  const rh = TREND_RANGES.find(r => r.key === range) || TREND_RANGES[0];
-  const nums = series.filter(s => typeof s.value === 'number').map(s => s.value);
-  if (!k || !nums.length) return `<b>${esc(rh.label)}</b> · 该区间暂无数据`;
-  const samples = series.reduce((a, s) => a + (s.samples || 0), 0);
-  const start = esc(k.first_day || '—');
-  if (kind === 'balance') {
-    return `<b>${esc(rh.label)}</b> · 合计 <b>${fmtMoney(sumRound(nums))}</b> · 有值 ${nums.length}/${series.length} 根 · 起点 ${start} · 源精度 0.01 元`;
-  }
-  const total = sumRound(nums);
-  const peak = Math.max(...series.filter(s => typeof s.peak === 'number').map(s => s.peak), 0);
-  return `<b>${esc(rh.label)}</b> · 用量合计 <b>${total.toFixed(2)}%</b> · 最高时段峰值 ${peak.toFixed(2)}% · `
-    + `有值 <b>${nums.length}</b>/${series.length} 根 · 采样 ${samples.toLocaleString()} 点 · 起点 ${start} · 源精度 整数 %`;
-}
 
 // trendSubLine 卡头副行：复用首页卡片的口径（周/月用量或账户余额），两页数字同源。
 function trendSubLine(prov) {
@@ -1693,7 +1654,6 @@ function trendCardHtml(prov, k) {
       <div class="tseg">${segs}</div>
     </div>
     ${trendChartHtml(kind, series, unit)}
-    <div class="tfoot">${trendFootHtml(k, kind, series, range)}</div>
   </div>`;
 }
 

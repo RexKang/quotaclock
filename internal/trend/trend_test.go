@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 	"time"
 
@@ -98,7 +99,7 @@ func TestObserveGainAcrossWindowReset(t *testing.T) {
 	}
 	kd := dayOf(t, s, "opencode.k1", d)
 	if kd.Pct.Gain != 4 {
-		t.Errorf("用量 = %v，期望 4（= (100−99) + 3）", kd.Pct.Gain)
+		t.Errorf("用量 = %v，期望 4（= (100−99) + (3−0)：老窗口最后 1 点 + 新窗口 3 点）", kd.Pct.Gain)
 	}
 	if kd.Pct.Resets != 1 {
 		t.Errorf("重置次数 = %d，期望 1", kd.Pct.Resets)
@@ -107,13 +108,44 @@ func TestObserveGainAcrossWindowReset(t *testing.T) {
 		t.Errorf("峰值/末值 = %v/%v，期望 100/3", kd.Pct.Peak, kd.Pct.Last)
 	}
 
-	// 跌幅（窗口重置）要补回「重置前填满的那段」：(100 − prev) + cur
+	// 换窗那一步：只记新窗口的本次值
 	s2 := newStore(t)
 	t1 := time.Date(2026, 9, 22, 9, 0, 0, 0, time.Local)
 	s2.Observe("opencode.k2", "OC", "opencode", t1, ocBody(40))
 	s2.Observe("opencode.k2", "OC", "opencode", t1.Add(5*time.Minute), ocBody(5))
-	if g := dayOf(t, s2, "opencode.k2", d).Pct.Gain; g != 65 {
-		t.Errorf("40 → 5（窗口重置）用量 = %v，期望 65 = (100−40) + 5", g)
+	// 换窗时**不补**「窗口打满还差多少」：没被用掉的剩余额度是作废的，不是用掉的。
+	if g := dayOf(t, s2, "opencode.k2", d).Pct.Gain; g != 5 {
+		t.Errorf("40 → 5（换窗）用量 = %v，期望 5（= 新窗口自 0 起算的本次值）", g)
+	}
+}
+
+// zpBody 造一份智谱 5 小时档的应答（percentage = v）。
+func zpBody(v float64) json.RawMessage {
+	return json.RawMessage(`{"data":{"limits":[{"unit":3,"number":5,"percentage":` +
+		strconv.FormatFloat(v, 'f', -1, 64) + `}]}}`)
+}
+
+// 用户 260922 给的判据：采集序列 88 → 90 → 91 → 0 → 1，实际用量 = (91−88) + (1−0) = 4。
+// 逐样本看：+2、+1、换窗那一步记 cur=0、+1；换窗时**不**补 (100−91) —— 那 9% 是随换窗作废的。
+func TestObserveGainUserSequence88To1(t *testing.T) {
+	s := newStore(t)
+	d := day(2026, 9, 22)
+	t0 := time.Date(2026, 9, 22, 10, 0, 0, 0, time.Local)
+	for i, v := range []float64{88, 90, 91, 0, 1} {
+		s.Observe("zhipu-glm.k1", "GLM", "zhipu-glm", t0.Add(time.Duration(i*5)*time.Minute), zpBody(v))
+	}
+	kd := dayOf(t, s, "zhipu-glm.k1", d)
+	if kd.Pct == nil {
+		t.Fatal("没有百分比记录")
+	}
+	if kd.Pct.Gain != 4 {
+		t.Errorf("用量 = %v，期望 4（= (91−88) + (1−0)）", kd.Pct.Gain)
+	}
+	if kd.Pct.Resets != 1 {
+		t.Errorf("重置次数 = %v，期望 1", kd.Pct.Resets)
+	}
+	if kd.Pct.Peak != 91 {
+		t.Errorf("峰值 = %v，期望 91（水平值另存，不受口径影响）", kd.Pct.Peak)
 	}
 }
 

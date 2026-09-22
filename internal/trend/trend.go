@@ -118,11 +118,14 @@ func (s *Store) Observe(id, name, platform string, at time.Time, data json.RawMe
 	}
 	prev, hadPrev := s.lastAt[id]
 
-	// 该样本相对上次样本的用量（百分比口径）。两处要点：
+	// 该样本相对上次样本的用量（百分比口径）。三处要点：
 	//  ① 上一次的值**跨小时、跨天**沿用（不是在当天/当小时内比），否则每个时段第一条样本的用量会被丢掉；
-	//  ② 数值下跌 = 5 小时窗口已重置。重置前那一段用掉的额度 = 窗口容量 − 上次值（打满即重置），
-	//     所以这段用量 = (100 − prev) + cur。用户给的例子：99 → 100 → 3 应为 (100−99) + 3 = 4。
-	//     多次重置无法从样本里识别，只按一次算 → 结果是下限。
+	//  ② 数值下跌 = 5 小时窗口换窗（重置）：**新窗口从 0 起算，所以这一步的用量就是本次值 cur**。
+	//     不要补「窗口打满还差多少」—— 换窗时没被用掉的剩余额度是**作废**的，不是用掉的。
+	//     用户给的例子：采集序列 88 → 90 → 91 → 0 → 1，实际用量 = (91−88) + (1−0) = 4
+	//     （老窗口用了 3，换窗后新窗口用了 1）；逐样本看就是 +2、+1、换窗记 cur=0、+1。
+	//  ③ 若某平台的百分比是**滚动窗口**（旧请求逐渐过期会让数值慢慢下降，而不是换窗），
+	//     这里会把下降量记成用量 —— 两个样本之间无法区分，属于已知高估；Resets 计数可用于观察频率。
 	var delta float64
 	var isReset bool
 	hadPrevPct := s.hasPct[id] // 本样本之前是否已有上一次百分比（供当日与当小时两处累加判断）
@@ -130,11 +133,7 @@ func (s *Store) Observe(id, name, platform string, at time.Time, data json.RawMe
 		if hadPrevPct {
 			delta = *ex.Pct - s.prevPct[id]
 			if delta < 0 {
-				missed := 100 - s.prevPct[id]
-				if missed < 0 {
-					missed = 0
-				}
-				delta = missed + *ex.Pct
+				delta = *ex.Pct // 换窗：新窗口自 0 起算
 				isReset = true
 			}
 		}
