@@ -1,6 +1,7 @@
 package collector
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/RexKang/QuotaClock/internal/config"
@@ -11,6 +12,13 @@ import (
 // CacheWriter 缓存落盘出口（persist.CacheWriter 实现）。nil = 不启用缓存。
 type CacheWriter interface {
 	Save(c *persist.Cache)
+}
+
+// Sampler 趋势采样出口（v0.4.0，trend.Store 实现）。nil = 不记录趋势。
+// 只在**真实采集成功**时投递：缓存恢复的数据（cached）不是新样本，
+// 失败态更不能写 0——「没采到」和「用了 0%」在趋势图上必须是两件事。
+type Sampler interface {
+	Observe(id, name, platform string, at time.Time, data json.RawMessage)
 }
 
 // CacheFromStates 把当前状态集转成缓存内容（v0.2.4）：

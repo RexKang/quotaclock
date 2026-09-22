@@ -27,6 +27,8 @@ type Scheduler struct {
 	inflight         map[string]int      // 平台 → 在途采集数：同平台请求串行化（防同平台 key 并发互撞）
 
 	cache CacheWriter // 上次成功数据落盘出口（nil = 不启用缓存，v0.2.4）
+	// sampler 趋势采样出口（nil = 不记录趋势，v0.4.0）。
+	sampler Sampler
 
 	wake chan struct{} // 热生效唤醒：配置保存后尽快开跑下一 tick（验收 #9 ≤1 轮询周期红字的前提）
 
@@ -65,6 +67,24 @@ func (s *Scheduler) SetCacheWriter(w CacheWriter) {
 	s.mu.Lock()
 	s.cache = w
 	s.mu.Unlock()
+}
+
+// SetSampler 挂载趋势采样出口（main 装配；nil = 不记趋势）。
+func (s *Scheduler) SetSampler(sp Sampler) {
+	s.mu.Lock()
+	s.sampler = sp
+	s.mu.Unlock()
+}
+
+// sampleLocked 把一次**真实成功**的样本投给趋势聚合器。
+// 投递内容 = 该 Key 自己的 last_success_at（不是 tick 时刻）：同平台多 Key 是错峰采集的，
+// 用 tick 时刻会把 5 分钟前的数据记成「现在」。窗口/缺口判定在 trend 侧完成。
+// 纯内存操作（不落盘、不阻塞），落盘由 trend.Store 按小时自行安排。
+func (s *Scheduler) sampleLocked(platform string, st *ProviderState) {
+	if s.sampler == nil || st == nil || st.LastSuccessAt == nil || len(st.Data) == 0 {
+		return
+	}
+	s.sampler.Observe(st.ID, st.Name, platform, *st.LastSuccessAt, st.Data)
 }
 
 // SeedCached 用 cache.json 恢复的状态填充「尚未完成首次采集」的空态（v0.2.4，启动时调用一次）：
@@ -535,6 +555,7 @@ func (s *Scheduler) collectProvider(ctx context.Context, p *config.RuntimeProvid
 	if st.Status == StatusOK {
 		// 只有真实成功才刷新缓存（失败态同上：保留上次成功数据，不覆写）
 		s.saveCacheLocked()
+		s.sampleLocked(p.Platform, &st)
 	}
 }
 

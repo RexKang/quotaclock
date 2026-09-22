@@ -23,6 +23,7 @@ import (
 	"github.com/RexKang/QuotaClock/internal/logx"
 	"github.com/RexKang/QuotaClock/internal/persist"
 	"github.com/RexKang/QuotaClock/internal/server"
+	"github.com/RexKang/QuotaClock/internal/trend"
 	"github.com/RexKang/QuotaClock/web"
 )
 
@@ -183,6 +184,14 @@ func main() {
 	cacheWriter := persist.StartCacheWriter(cachePath)
 	sched.SetCacheWriter(cacheWriter)
 
+	// 11.6 用量趋势（v0.4.0）：每次成功采集进内存聚合，每小时 + 退出时落盘
+	trendPath := persist.TrendsPathOf(dir)
+	trends := trend.New(trendPath)
+	if n := trends.Loaded(); n > 0 {
+		logx.Infof("已加载 %d 个 API Key 的趋势数据（%s）", n, trendPath)
+	}
+	sched.SetSampler(trends)
+
 	// 12. HTTP 服务
 	static, err := web.Index()
 	if err != nil {
@@ -194,6 +203,7 @@ func main() {
 		MasterKey:       key,
 		SessionKey:      sessionKey,
 		Store:           store,
+		Trends:          trends,
 		Static:          static,
 		Icons:           web.Icons(),
 		OnConfigChanged: sched.Reload,
@@ -245,6 +255,8 @@ func main() {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 	go func() { sched.Run(ctx) }()
+	// 趋势每小时落盘一次（用户要求「后台进程每小时保存」），ctx 结束时最后落一次
+	trends.Start(ctx, trend.FlushInterval)
 
 	<-sigCh
 	logx.Infof("收到退出信号，开始优雅关停（停采集 ∥ HTTP drain）...")
@@ -262,6 +274,7 @@ func main() {
 	sched.Wait() // 等待在途采集请求结束（与 drain 并行）
 	<-drainDone
 	cacheWriter.Close() // 最后一份缓存落盘（在途采集已全部结束）
+	trends.Flush()      // 趋势最后一份落盘（同上；错过这次就要等下一个整点）
 
 	if err := lockHandle.Release(); err != nil {
 		logx.Warnf("删除锁文件失败: %v", err)
