@@ -212,6 +212,7 @@
   .tcols { position: absolute; left: 0; right: 0; display: flex; align-items: flex-end; justify-content: center; gap: 4px; }
   .tcol { position: relative; flex: 1 1 0; max-width: 72px; min-width: 3px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
   .tbar { width: 100%; border-radius: 2px 2px 0 0; }
+  .tbar.tanim { transition: height .12s ease-out; }
   /* 0 值：轴上不画任何可见痕迹（画 2px 灰条会被读成「一个很小的值」），只留透明的悬停命中区 */
   .tzero { width: 100%; height: 4px; background: transparent; }
   /* 无采样：**不**逐列画虚线框 —— 相邻列的框顶边会在同一条水平线上连成假网格线（实测 12 列全在 top:12px），
@@ -1620,12 +1621,12 @@ function trendChartHtml(kind, series, unit) {
     const color = kind === 'balance' ? 'var(--accent)' : sevColor(slotSeverity(v, undefined));
     const isPeak = dense && !peakDone && v === peakVal;
     if (isPeak) peakDone = true;
-    // 密柱视图（>20 根）只在峰值那根标短格式（"92" / "3.1"）：24px 宽的柱放不下 "92.00"，
-    // 精确到 2 位的值在页脚与悬停明细里，那里不受宽度限制
+    // 密柱（>20 根、柱宽 <30px）放不下 "92.00"（约 26px > 24.2px 柱宽），
+    // 所以每根非零柱都标「能放下的最短形式」（整数 / 一位小数），2 位精度的完整值在页脚与悬停明细里给。
     const short = kind === 'percent' ? (v >= 10 ? String(Math.round(v)) : v.toFixed(1)) : v.toFixed(1);
-    const label = (!dense || isPeak) ? `<div class="tval${dense ? ' pk' : ''}">${dense ? short : v.toFixed(2)}</div>` : '';
+    const label = `<div class="tval${dense ? ' pk' : ''}">${dense ? short : v.toFixed(2)}</div>`;
     return `<div class="tcol" ${tip}>${tag}${label}
-      <div class="tbar" style="height:${px}px;background:${color}"></div></div>`;
+      <div class="tbar" data-h="${px}" style="height:0px;background:${color}"></div></div>`;
   }).join('');
   // 横轴：最多 8 个标签
   const step = Math.max(1, Math.ceil(series.length / 8));
@@ -1712,6 +1713,8 @@ function renderTrend() {
   box.innerHTML = provs.map(prov => trendCardHtml(prov, trendKeyOf(prov.id))).join('');
   trendHoverCol = null;
   hideTrendTip();
+  paintBarHeights(trendAnimateNext);
+  trendAnimateNext = false;
   paintNoSampleRuns();
   reapplyTrendHover();
   if (!box.dataset.bound) {
@@ -1720,6 +1723,7 @@ function renderTrend() {
       const btn = e.target.closest('[data-tseg]');
       if (!btn) return;
       trendRange[btn.dataset.tid] = btn.dataset.tseg;
+      trendAnimateNext = true;      // 只有用户主动切区间才做柱高过渡
       renderTrend();
     });
     // 悬停：鼠标在绘图区里按 x 找最近的一列就展示（对齐图表插件的手感——不用正好压在柱子上）
@@ -1750,6 +1754,7 @@ function renderTrend() {
 // 当前悬停的那一列（鼠标在绘图区里按 x 找最近的列，不要求压在柱子上）
 let trendHoverCol = null;
 let trendLastPt = null;
+let trendAnimateNext = false;
 function nearestTrendCol(plot, clientX) {
   const cols = plot.querySelectorAll('.tcol');
   let best = null, bestD = Infinity;
@@ -1780,6 +1785,15 @@ function hideTrendBand() {
   const band = document.querySelector('#trendList .tband');
   if (band) band.style.display = 'none';
 }
+// 柱高落地：渲染时先写 0，再在这里赋真值，配合 .tanim 的 CSS 过渡做出「长出来」的效果。
+// animate=false（首屏、30s 轮询重绘）时关掉过渡，避免每次刷新都抖一下。
+function paintBarHeights(animate) {
+  document.querySelectorAll('#trendList .tbar[data-h]').forEach(b => {
+    if (animate) b.classList.add('tanim'); else { b.style.transition = 'none'; }
+    b.style.height = b.dataset.h + 'px';
+  });
+}
+
 // 连续的无采样列合并成一条淡色区段：逐列画框会在顶部连成一条假网格线（实测 12 列 top 全为 12px），
 // 合并后既保住了「无采样 ≠ 0」的可区分，又不产生任何对齐的水平边缘。
 // 位置用百分比，窗口缩放时随 flex 列一起伸缩，不需要 resize 重算。
