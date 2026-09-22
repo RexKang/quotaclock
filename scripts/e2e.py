@@ -672,11 +672,11 @@ def scenario_enabled_and_cache(binpath, d, port, cfg, mock):
         cached_at = cache["providers"][0]["last_success_at"]
         files = sorted(os.listdir(d))
         allowed = all(re.fullmatch(r"config\d*\.json", x) is not None
-                      or x in ("key.bin", "cache.json")
+                      or x in ("key.bin", "cache.json", "trends.json")  # trends.json：v0.4.0 用量趋势
                       or (x.startswith("quotaclock-") and x.endswith(".lock"))
                       or re.fullmatch(r"config\d*\.json\.v\d+(-\d+)?\.bak", x) is not None  # 迁移前备份（v0.2.5）
                       or x.endswith(".tmp") for x in files)
-        check("写盘白名单：目录内仅运行时白名单文件（含 cache.json）", allowed, json.dumps(files))
+        check("写盘白名单：目录内仅运行时白名单文件（含 cache.json / trends.json）", allowed, json.dumps(files))
 
         # 重启：首屏应为 cached（上游故意慢），首轮采集后转 ok
         inst.kill()
@@ -857,6 +857,100 @@ def scenario_v030(binpath, mock):
         inst.kill()
 
 
+def scenario_trends(binpath, mock):
+    """v0.4.0 趋势：采集入档 / 接口契约 / 删除 AK 连带清理（数据层兜底）。"""
+    print("\n== 场景：趋势（采集入档 / 接口契约 / 删除 AK 连带清理） ==")
+    d = tempfile.mkdtemp(prefix="qc-e2e-trend-")
+    port = free_port()
+    cfg = os.path.join(d, "config.json")
+    seed_path = os.path.join(d, "trends.json")
+    # 预置一份 trends.json：含一个稍后会被删掉的 Key。
+    # 目的：清理必须落在**数据层**（文件里真的没了），而不是只从内存视图里消失。
+    with open(seed_path, "w", encoding="utf-8") as f:
+        json.dump({
+            "version": 1,
+            "written_at": "2026-09-21T08:00:00+08:00",
+            "keys": {
+                "opencode.gone": {
+                    "id": "opencode.gone", "name": "Gone", "platform": "opencode", "kind": "percent",
+                    "days": [{"date": "2026-09-21", "samples": 10, "gaps": 0,
+                              "pct": {"peak": 30, "last": 30, "gain": 30, "samples": 10}}],
+                    "hours": [],
+                }
+            },
+        }, f)
+    inst = Instance(binpath, cfg, port, upstream=mock.url())
+    base = f"{BASE}:{port}"
+    try:
+        inst.wait_ready()
+        check("启动加载既有趋势数据", "已加载 1 个 API Key 的趋势数据" in inst.log())
+
+        code, _, tv = http("GET", base + "/api/trends")
+        check("趋势接口公开可读（与 /api/quotas 同级）", code == 200, str(code))
+        check("预置趋势数据可见", any(k["id"] == "opencode.gone" for k in tv["keys"]), json.dumps(tv["keys"])[:160])
+        check("daily 定长连续（默认 400 天）", len(tv["keys"][0]["daily"]) == 400, len(tv["keys"][0]["daily"]))
+        check("hours 定长连续（48 槽）", len(tv["keys"][0]["hours"]) == 48, len(tv["keys"][0]["hours"]))
+        check("缺数据的槽位是 null（不画成 0）",
+              sum(1 for x in tv["keys"][0]["daily"] if x is None) == 399,
+              json.dumps(tv["keys"][0]["daily"])[:120])
+        code, _, tv7 = http("GET", base + "/api/trends?days=7")
+        check("days=7 生效", code == 200 and len(tv7["keys"][0]["daily"]) == 7)
+        code, _, _ = http("GET", base + "/api/trends?days=abc")
+        check("days 非法 → 400", code == 400, str(code))
+
+        # 登录 + 配两个 OpenCode Key；mock 换成 rolling.percent（= 5 小时额度口径）
+        mock.payload = {"usage": {"rolling": {"percent": 42}}}
+        code, hdr, _ = http("POST", base + "/api/login", {"password": "Quota@2026090S"})
+        auth = {"Cookie": "qc_session=" + re.search(r"qc_session=([^;]+)", hdr.get("Set-Cookie", "")).group(1)}
+        put = {
+            "version": CUR_VERSION,
+            "listen": {"host": "127.0.0.1", "port": port},
+            "collector": {"interval_base_s": 30, "jitter_min_s": 1, "jitter_max_s": 2,
+                          "stagger_min_s": 1, "stagger_max_s": 2, "backoff_multiplier": 2, "backoff_max_s": 1800},
+            "auth": {"mode": "admin"},
+            "providers": [{"platform": "opencode", "access_keys": [
+                {"id": "keep", "name": "保留", "token": "sk-e2e-keep-1234"},
+                {"id": "gone", "name": "待删", "token": "sk-e2e-gone-5678"},
+            ]}],
+        }
+        code, _, body = http("PUT", base + "/api/config", put, auth)
+        check("配两个 Key 的 PUT 200", code == 200 and body.get("ok") is True, json.dumps(body)[:160])
+        snap = wait_snapshot(base, lambda s: len([p for p in s["providers"] if p.get("status") == "ok"]) == 2, timeout=40)
+        check("两个 Key 都采集成功", len([p for p in snap["providers"] if p.get("status") == "ok"]) == 2,
+              json.dumps(snap)[:200])
+
+        _, _, tv = http("GET", base + "/api/trends")
+        kmap = {k["id"]: k for k in tv["keys"]}
+        check("两个 Key 都进了趋势", {"opencode.keep", "opencode.gone"} <= set(kmap), json.dumps(list(kmap)))
+        gk = kmap["opencode.gone"]
+        cell = gk["daily"][-1]
+        check("daily 末位 = 今天且有数据", cell is not None and cell["date"] == tv["today"],
+              json.dumps(cell)[:160])
+        check("柱高口径 = 5 小时额度峰值 42", bool(cell) and cell["pct"]["peak"] == 42, json.dumps(cell)[:160])
+        check("采样点数已累计", bool(cell) and cell["pct"]["samples"] >= 1, json.dumps(cell)[:120])
+        check("数值按源精度落盘（整数 42，不放大成小数）", bool(cell) and cell["pct"]["peak"] == 42 and cell["pct"]["last"] == 42)
+        check("预置历史 + 今日并存（total_days=2）", gk["total_days"] == 2, gk["total_days"])
+
+        # 删除 gone → 趋势数据连带清理（确认框在前端，这里是数据层兜底）
+        put["providers"][0]["access_keys"] = [{"id": "keep", "name": "保留"}]
+        code, _, _ = http("PUT", base + "/api/config", put, auth)
+        check("删除 Key 的 PUT 200", code == 200, str(code))
+        _, _, tv2 = http("GET", base + "/api/trends")
+        ids = [k["id"] for k in tv2["keys"]]
+        check("删除 AK 后趋势不再可见", "opencode.gone" not in ids, json.dumps(ids))
+        check("未删的 Key 趋势保留", "opencode.keep" in ids, json.dumps(ids))
+        with open(seed_path, encoding="utf-8") as f:
+            saved = json.load(f)
+        check("趋势文件里也已清理（不只在内存）", "opencode.gone" not in (saved.get("keys") or {}),
+              json.dumps(list((saved.get("keys") or {}).keys())))
+        check("清理动作有 INFO 日志", "清理了" in inst.log())
+        blob = json.dumps(saved)
+        check("趋势文件不含 token 明文/密文（只有指标）",
+              "sk-e2e-keep-1234" not in blob and "sk-e2e-gone-5678" not in blob and "token_cipher" not in blob)
+    finally:
+        inst.kill()
+
+
 def main():
     if not BIN or not os.path.exists(BIN):
         print("用法: python scripts/e2e.py <quotaclock 可执行文件>")
@@ -876,6 +970,7 @@ def main():
         scenario_migration(binpath, mock)
         scenario_migrate_v3(binpath, mock)
         scenario_v030(binpath, mock)
+        scenario_trends(binpath, mock)
         scenario_enabled_and_cache(binpath, d, port, cfg, mock)
         scenario_startup_time(binpath)
     finally:
