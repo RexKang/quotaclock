@@ -338,9 +338,9 @@
   <div id="trendHint" class="hint"></div>
   <div id="trendTip" class="ttip"></div>
   <div class="tlegend">
-    <span><i style="background:var(--ok)"></i>&lt; 70%</span>
+    <span><i style="background:var(--ok)"></i>该时段用量 &lt; 70%</span>
     <span><i style="background:var(--warn)"></i>70 – 90%</span>
-    <span><i style="background:var(--err)"></i>≥ 90%（100% = 已用尽）</span>
+    <span><i style="background:var(--err)"></i>≥ 90%（一小时内烧掉近一整个 5 小时窗口）</span>
     <span><i style="background:var(--accent)"></i>金额类（消费没有健康语义，不上红黄绿）</span>
     <span><i style="background:#2c3346;height:2px"></i>0.00：真有采样，只是没用</span>
     <span><span class="tln"></span>无采样：进程没跑 / 采集失败，不画成 0</span>
@@ -1409,19 +1409,24 @@ function tipAttr(t) { return esc(JSON.stringify(t)).replace(/'/g, '&#39;'); }
 
 /* ---------- 序列构造：区间 → 柱子 ---------- */
 // 元素：{ label, value(数字|null), note, stub(0 值也有采样), topup, today, tip:{t,r} }
-function elemPercent(label, pm, today, extra) {
-  const v = pm && typeof pm.peak === 'number' ? pm.peak : null;
+// elemPercent 百分比口径：**柱高 = 该时段实际用量**（相邻样本差额之和），不是当时的水平值 ——
+// 11 点 4% → 12 点 7%，这一小时用了 3%，柱高就该是 3（用户 260922 判定）。
+// 窗口重置（数值下跌）按 (窗口容量 − 上次值) + 本次补回：99 → 100 → 3 = (100−99) + 3 = 4。
+// 水平值（峰值）仍然记着，放在悬停明细里。
+function elemPercent(label, pm, today) {
+  const usage = pm && typeof pm.gain === 'number' ? pm.gain : null;
+  const peak = pm && typeof pm.peak === 'number' ? pm.peak : null;
   const rows = [];
-  if (extra) rows.push(extra);
-  if (pm && typeof pm.gain === 'number') rows.push(['增量 ≈', pm.gain.toFixed(2) + '%（估计）']);
+  if (peak !== null) rows.push(['该时段峰值', peak.toFixed(2) + '%']);
   rows.push(['采样', (pm ? pm.samples || 0 : 0) + ' 点']);
+  if (pm && pm.resets) rows.push(['窗口重置', pm.resets + ' 次（重置前那段已按 (100−上次)+本次 补回）']);
   rows.push(['源精度', '整数 %']);
   return {
-    label, value: v, stub: v === 0, today,
-    note: v === null ? '无采样' : '',
+    label, value: usage, peak, stub: usage === 0, today,
+    note: usage === null ? '无采样' : '',
     tip: {
-      t: `${label} · ${v === null ? '无采样' : '峰值 ' + v.toFixed(2) + '%'}`,
-      r: v === null ? [['原因', '该区间没有采到数据（进程没跑或采集失败）']] : rows,
+      t: `${label} · ${usage === null ? '无采样' : '用量 ' + usage.toFixed(2) + '%'}`,
+      r: usage === null ? [['原因', '该时段没有采到数据（进程没跑或采集失败）']] : rows,
     },
   };
 }
@@ -1537,13 +1542,16 @@ function seriesOfBuckets(k, kind, mode) {
         },
       };
     }
-    const v = b.peaks.length ? Math.max(...b.peaks) : null;
+    // 用量是可加量（百分点），所以周/月取合计；峰值另列在悬停里
+    const v = b.peaks.length ? sumRound([b.gains]) : null;
+    const peak = b.peaks.length ? Math.max(...b.peaks) : null;
     return {
-      label: b.label, value: v, stub: v === 0, today,
+      label: b.label, value: v, peak, stub: v === 0, today,
       note: v === null ? '无采样' : '',
       tip: {
-        t: `${b.label} · ${v === null ? '无采样' : '峰值 ' + v.toFixed(2) + '%'}`,
-        r: [['增量合计 ≈', b.gains.toFixed(2) + '%（估计）'], ['有值天数', `${b.peaks.length}/${b.days} 天`],
+        t: `${b.label} · ${v === null ? '无采样' : '用量 ' + v.toFixed(2) + '%'}`,
+        r: [['区间峰值', peak === null ? '—' : peak.toFixed(2) + '%'],
+            ['有值天数', `${b.peaks.length}/${b.days} 天`],
             ['采样合计', b.samples + ' 点'], ['源精度', '整数 %']],
       },
     };
@@ -1562,9 +1570,11 @@ function seriesOf(k, kind, range) {
 }
 
 /* ---------- 渲染 ---------- */
+// 用量口径不固定 0-100：一天里发生多次窗口重置时，用量合计会超过 100（那是真实的百分比点消耗）。
+// 取区间最大值取整刻度，并在刻度跨过 100 时画一条「满窗」参考线。
 function trendScale(kind, series) {
-  if (kind !== 'balance') return 100;   // 百分比固定 0-100：可跨卡比较，也不夸大 26% 这种值
   const mx = Math.max(0, ...series.map(s => (typeof s.value === 'number' ? s.value : 0)));
+  if (kind !== 'balance' && mx <= 100) return 100;
   return niceMax(mx);
 }
 function tickText(kind, v) {
@@ -1579,7 +1589,10 @@ function trendChartHtml(kind, series, unit) {
     + `<span class="tunit">${esc(unit)}</span>`;
   const grid = ticks.map(tk =>
     `<div class="tgridline" style="bottom:${Math.round(TREND_BAR_H * tk / 100) + TREND_AXIS_H}px"></div>`).join('');
-  const ref = kind === 'percent' ? `<div class="tthrow" style="bottom:${TREND_AXIS_H + TREND_BAR_H}px"></div>` : '';
+  // 百分比口径：刻度正好是 0-100 时，顶线就是 100%；刻度超过 100 时，在 100 处单独画「满窗」线
+  const ref = (kind === 'percent' && scale > 100)
+    ? `<div class="tthrow" style="bottom:${Math.round(TREND_AXIS_H + TREND_BAR_H * 100 / scale)}px"></div>`
+    : '';
   const hasAny = series.some(s => s.value !== null || s.stub);
   // 柱太密（>20 根，柱宽 < 30px）时只标峰值那根：数字放不下会压到邻柱，精确值交给悬停明细
   const dense = series.length > 20;
@@ -1631,9 +1644,9 @@ function trendFootHtml(k, kind, series, range) {
   if (kind === 'balance') {
     return `<b>${esc(rh.label)}</b> · 合计 <b>${fmtMoney(sumRound(nums))}</b> · 有值 ${nums.length}/${series.length} 根 · 起点 ${start} · 源精度 0.01 元`;
   }
-  const peak = Math.max(...nums);
-  const mean = Math.round(nums.reduce((a, c) => a + c, 0) / nums.length * 100) / 100;
-  return `<b>${esc(rh.label)}</b> · 峰值 <b>${peak.toFixed(2)}%</b> · 均值 ${mean.toFixed(2)}% · 采样 ${samples.toLocaleString()} 点 · 起点 ${start} · 源精度 整数 %`;
+  const total = sumRound(nums);
+  const peak = Math.max(...series.filter(s => typeof s.peak === 'number').map(s => s.peak), 0);
+  return `<b>${esc(rh.label)}</b> · 用量合计 <b>${total.toFixed(2)}%</b> · 最高时段峰值 ${peak.toFixed(2)}% · 采样 ${samples.toLocaleString()} 点 · 起点 ${start} · 源精度 整数 %`;
 }
 
 // trendSubLine 卡头副行：复用首页卡片的口径（周/月用量或账户余额），两页数字同源。
@@ -1660,8 +1673,10 @@ function trendCardHtml(prov, k) {
   const unit = kind === 'balance' ? '元' : '%';
   const hasData = !!(k && k.total_days > 0);
   const note = kind === 'balance'
-    ? '柱高 = 该区间的实际消费（相邻余额快照之差）。充值的时段不出值，标「充值」；采样有缺口或起点不全时首尾差不等于真实消费，画成虚线空槽 —— 宁可不给值，也不给一个错的数。'
-    : '柱高 = 该区间的「5 小时额度峰值」（可精确复算）。5 小时额度是重置型窗口，空闲时段天然是 0；虚线空槽 = 那个时段没采到数据（不是 0）。';
+    ? '柱高 = 该时段的实际消费（相邻余额快照之差）。充值的时段不出值，标「充值」；采样有缺口或起点不全时首尾差不等于真实消费，画成虚线空槽 —— 宁可不给值，也不给一个错的数。'
+    : '柱高 = 该时段的**实际用量**（相邻采样的额度百分比差额之和）：11 点 4%、12 点 7% → 12 点这小时用了 3%。'
+      + '5 小时额度是重置型窗口，数值下跌即窗口重置，那段按 (100 − 上次值) + 本次补回（多次重置无法从样本识别，按一次算，结果是下限）。'
+      + '虚线空槽 = 那个时段没采到数据（不是 0）；该时段峰值在悬停明细里。';
   return `<div class="tcard" title="${esc(note)}">
     <div class="thead">
       <div class="tname">${esc(prov.name)}<span class="tsub">${esc(trendSubLine(prov)) || (hasData ? '&nbsp;' : '尚无趋势数据')}</span></div>
@@ -1686,7 +1701,8 @@ function renderTrendHint(provs) {
       + '服务没运行的时段记为「无采样」（虚线空槽），不会画成 0.00%。当日视图在首个采集周期后即可用，7 日 / 月度 / 季度 / 年度依次在 7 / 30 / 90 / 365 天后才完整。';
     return;
   }
-  el.innerHTML = `已积累 <b>${maxDays}</b> 天趋势数据。每张图可独立切区间：当日按小时、7 日与月度按天、季度按周、年度按月。`;
+  el.innerHTML = `已积累 <b>${maxDays}</b> 天趋势数据。柱高 = <b>该时段的实际用量</b>（相邻采样的额度差额之和，跨窗口重置已补回）；`
+    + '每张图可独立切区间：当日按小时、7 日与月度按天、季度按周、年度按月。';
 }
 
 function renderTrend() {

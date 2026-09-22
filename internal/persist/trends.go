@@ -58,10 +58,11 @@ type TrendDay struct {
 // TrendMetric 额度类指标（百分比）的当日/当小时聚合。
 // Peak/Last/Gain 都是「该区间内观测到的事实」，不引入任何外推。
 type TrendMetric struct {
-	Peak    float64 `json:"peak"` // 区间峰值：当日最紧到过多少（主口径，可精确复算）
+	Peak    float64 `json:"peak"` // 区间峰值（该时段最紧到过多少）
 	Last    float64 `json:"last"` // 区间最后一个样本值
-	Gain    float64 `json:"gain"` // 区间增量估计：相邻样本 max(0,Δ) 之和（跨窗口重置只能估）
+	Gain    float64 `json:"gain"` // 区间用量（主口径）：相邻样本差额之和，跨重置按 (容量 − 上次) + 本次 补回
 	Samples int     `json:"samples"`
+	Resets  int     `json:"resets,omitempty"` // 区间内识别到的窗口重置次数（多次重置无法从样本识别，按一次算 → 用量是下限）
 }
 
 // TrendBalance 余额类指标（DeepSeek）的当日聚合。

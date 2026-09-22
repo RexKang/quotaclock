@@ -71,29 +71,73 @@ func TestKindOf(t *testing.T) {
 
 // ---------- 聚合 ----------
 
-func TestObservePeakGainAndReset(t *testing.T) {
+func TestObserveGainIsUsageNotLevel(t *testing.T) {
 	s := newStore(t)
 	d := day(2026, 9, 22)
 	t0 := time.Date(2026, 9, 22, 9, 0, 0, 0, time.Local)
-	// 一串同窗口增长：10 → 25 → 40（增量 30），随后窗口重置 5 → 12（增量只计重置后的 5+7）
-	for i, v := range []float64{10, 25, 40, 5, 12} {
+	// 用户给的判定：11 点 4% → 12 点 7%，这段「实际使用」是 3%（不是水平值 7%）
+	for i, v := range []float64{4, 7} {
 		s.Observe("opencode.k1", "OC", "opencode", t0.Add(time.Duration(i*5)*time.Minute), ocBody(v))
 	}
 	kd := dayOf(t, s, "opencode.k1", d)
-	if kd.Pct == nil {
-		t.Fatal("应写入百分比聚合")
+	if kd.Pct.Peak != 7 {
+		t.Errorf("峰值 = %v，期望 7（水平值另存）", kd.Pct.Peak)
 	}
-	if kd.Pct.Peak != 40 || kd.Pct.Last != 12 {
-		t.Errorf("peak/last = %v/%v，期望 40/12", kd.Pct.Peak, kd.Pct.Last)
+	if kd.Pct.Gain != 3 {
+		t.Errorf("用量 = %v，期望 3（= 7 − 4）", kd.Pct.Gain)
 	}
-	if kd.Pct.Gain != 42 { // (25-10)+(40-25)+5+(12-5)
-		t.Errorf("gain = %v，期望 42（跨重置只计重置后的部分，是下限估计）", kd.Pct.Gain)
+}
+
+func TestObserveGainAcrossWindowReset(t *testing.T) {
+	s := newStore(t)
+	d := day(2026, 9, 22)
+	t0 := time.Date(2026, 9, 22, 9, 0, 0, 0, time.Local)
+	// 用户给的例子：99 → 100 → 3，这一段应为 (100−99) + 3 = 4
+	for i, v := range []float64{99, 100, 3} {
+		s.Observe("opencode.k1", "OC", "opencode", t0.Add(time.Duration(i*5)*time.Minute), ocBody(v))
 	}
-	if kd.Pct.Samples != 5 || kd.Samples != 5 {
-		t.Errorf("采样数 = %d/%d，期望 5/5", kd.Pct.Samples, kd.Samples)
+	kd := dayOf(t, s, "opencode.k1", d)
+	if kd.Pct.Gain != 4 {
+		t.Errorf("用量 = %v，期望 4（= (100−99) + 3）", kd.Pct.Gain)
 	}
-	if kd.Gaps != 0 {
-		t.Errorf("5 分钟间隔不该记缺口，实际 %d", kd.Gaps)
+	if kd.Pct.Resets != 1 {
+		t.Errorf("重置次数 = %d，期望 1", kd.Pct.Resets)
+	}
+	if kd.Pct.Peak != 100 || kd.Pct.Last != 3 {
+		t.Errorf("峰值/末值 = %v/%v，期望 100/3", kd.Pct.Peak, kd.Pct.Last)
+	}
+
+	// 跌幅（窗口重置）要补回「重置前填满的那段」：(100 − prev) + cur
+	s2 := newStore(t)
+	t1 := time.Date(2026, 9, 22, 9, 0, 0, 0, time.Local)
+	s2.Observe("opencode.k2", "OC", "opencode", t1, ocBody(40))
+	s2.Observe("opencode.k2", "OC", "opencode", t1.Add(5*time.Minute), ocBody(5))
+	if g := dayOf(t, s2, "opencode.k2", d).Pct.Gain; g != 65 {
+		t.Errorf("40 → 5（窗口重置）用量 = %v，期望 65 = (100−40) + 5", g)
+	}
+}
+
+func TestObserveGainCrossesDayAndHourBoundary(t *testing.T) {
+	s := newStore(t)
+	// 跨天：23:58 → 00:02 这一段用量（2%）要算进新的一天，而不是被当成「当天第一条」丢掉
+	s.Observe("opencode.k1", "OC", "opencode", time.Date(2026, 9, 22, 23, 58, 0, 0, time.Local), ocBody(40))
+	s.Observe("opencode.k1", "OC", "opencode", time.Date(2026, 9, 23, 0, 2, 0, 0, time.Local), ocBody(42))
+	nd := dayOf(t, s, "opencode.k1", day(2026, 9, 23))
+	if nd.Pct.Gain != 2 {
+		t.Errorf("跨天用量 = %v，期望 2", nd.Pct.Gain)
+	}
+	// 跨小时：小时槽也要有用量（此前小时级 gain 从未累加，悬停里恒为 0.00%）
+	s.Observe("opencode.k1", "OC", "opencode", time.Date(2026, 9, 23, 0, 7, 0, 0, time.Local), ocBody(49))
+	k := s.fileForTests().Keys["opencode.k1"]
+	last := k.Hours[len(k.Hours)-1]
+	if last.Slot != "2026-09-23T00" {
+		t.Fatalf("小时槽 = %s", last.Slot)
+	}
+	if last.Pct == nil || last.Pct.Gain != 9 { // 42 → 49 都在 0 点这一小时内
+		t.Errorf("当小时用量 = %v，期望 9", last.Pct)
+	}
+	if last.Pct.Peak != 49 {
+		t.Errorf("当小时峰值 = %v，期望 49", last.Pct.Peak)
 	}
 }
 

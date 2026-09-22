@@ -36,10 +36,12 @@ const (
 type Store struct {
 	path string
 
-	mu     sync.Mutex
-	file   *persist.TrendsFile
-	lastAt map[string]time.Time // runtime id → 上一次纳入聚合的样本时间
-	dirty  bool                 // 有未落盘的变动（避免每小时无谓重写同一个文件）
+	mu      sync.Mutex
+	file    *persist.TrendsFile
+	lastAt  map[string]time.Time // runtime id → 上一次纳入聚合的样本时间
+	prevPct map[string]float64   // runtime id → 上一次样本的额度百分比
+	hasPct  map[string]bool      // 上一次样本是否给了百分比（区分「没有值」与「值就是 0」）
+	dirty   bool                 // 有未落盘的变动（避免每小时无谓重写同一个文件）
 
 	now func() time.Time
 }
@@ -49,10 +51,12 @@ type Store struct {
 // 与校验和缓存同一处置原则：历史数据不值得让服务起不来）。
 func New(path string) *Store {
 	s := &Store{
-		path:   path,
-		file:   &persist.TrendsFile{Version: persist.TrendsVersion, Keys: map[string]*persist.TrendKey{}},
-		lastAt: map[string]time.Time{},
-		now:    time.Now,
+		path:    path,
+		file:    &persist.TrendsFile{Version: persist.TrendsVersion, Keys: map[string]*persist.TrendKey{}},
+		lastAt:  map[string]time.Time{},
+		prevPct: map[string]float64{},
+		hasPct:  map[string]bool{},
+		now:     time.Now,
 	}
 	f, err := persist.LoadTrends(path)
 	if err != nil {
@@ -69,6 +73,12 @@ func New(path string) *Store {
 			// 而不是把停机时长当作正常间隔。
 			if t, ok := parseAt(k.LastAt); ok {
 				s.lastAt[id] = t
+			}
+			// 增量要跨小时/跨天连续：重启后沿用最后一条记录的末值，
+			// 否则重启后的第一条样本会被当成「没有上一次」而丢掉那段用量。
+			if n := len(k.Days); n > 0 && k.Days[n-1].Pct != nil {
+				s.prevPct[id] = k.Days[n-1].Pct.Last
+				s.hasPct[id] = true
 			}
 		}
 	}
@@ -108,6 +118,30 @@ func (s *Store) Observe(id, name, platform string, at time.Time, data json.RawMe
 	}
 	prev, hadPrev := s.lastAt[id]
 
+	// 该样本相对上次样本的用量（百分比口径）。两处要点：
+	//  ① 上一次的值**跨小时、跨天**沿用（不是在当天/当小时内比），否则每个时段第一条样本的用量会被丢掉；
+	//  ② 数值下跌 = 5 小时窗口已重置。重置前那一段用掉的额度 = 窗口容量 − 上次值（打满即重置），
+	//     所以这段用量 = (100 − prev) + cur。用户给的例子：99 → 100 → 3 应为 (100−99) + 3 = 4。
+	//     多次重置无法从样本里识别，只按一次算 → 结果是下限。
+	var delta float64
+	var isReset bool
+	hadPrevPct := s.hasPct[id] // 本样本之前是否已有上一次百分比（供当日与当小时两处累加判断）
+	if ex.Pct != nil {
+		if hadPrevPct {
+			delta = *ex.Pct - s.prevPct[id]
+			if delta < 0 {
+				missed := 100 - s.prevPct[id]
+				if missed < 0 {
+					missed = 0
+				}
+				delta = missed + *ex.Pct
+				isReset = true
+			}
+		}
+		s.prevPct[id] = *ex.Pct
+		s.hasPct[id] = true
+	}
+
 	day := s.dayLocked(k, at)
 	if day == nil {
 		return // 乱序样本（旧日期的迟到投递）：丢弃，不回头改历史
@@ -118,24 +152,21 @@ func (s *Store) Observe(id, name, platform string, at time.Time, data json.RawMe
 	}
 	if ex.Pct != nil {
 		if day.Pct == nil {
-			day.Pct = &persist.TrendMetric{Samples: 0}
+			day.Pct = &persist.TrendMetric{}
 		}
 		m := day.Pct
 		cur := *ex.Pct
-		if m.Samples == 0 {
-			m.Peak, m.Last, m.Gain = cur, cur, 0
-		} else {
-			if cur > m.Peak {
-				m.Peak = cur
-			}
-			if cur >= m.Last {
-				m.Gain += cur - m.Last // 同一窗口内：增长部分就是新增用量
-			} else {
-				m.Gain += cur // 窗口已重置：重置前的尾巴无法测量，只计重置后的部分（下限估计）
-			}
-			m.Last = cur
+		if m.Samples == 0 || cur > m.Peak {
+			m.Peak = cur
 		}
+		m.Last = cur
 		m.Samples++
+		if hadPrevPct {
+			m.Gain += delta
+			if isReset {
+				m.Resets++
+			}
+		}
 	}
 	if ex.Balance != nil {
 		if day.Balance == nil {
@@ -168,7 +199,7 @@ func (s *Store) Observe(id, name, platform string, at time.Time, data json.RawMe
 		}
 	}
 
-	s.updateHourLocked(k, at, ex)
+	s.updateHourLocked(k, at, ex, delta, isReset, hadPrevPct)
 	k.LastAt = fmtTime(at)
 	if k.FirstAt == "" {
 		k.FirstAt = k.LastAt
@@ -198,7 +229,7 @@ func (s *Store) dayLocked(k *persist.TrendKey, at time.Time) *persist.TrendDay {
 }
 
 // updateHourLocked 更新小时槽（当日视图的数据源）。
-func (s *Store) updateHourLocked(k *persist.TrendKey, at time.Time, ex Extracted) {
+func (s *Store) updateHourLocked(k *persist.TrendKey, at time.Time, ex Extracted, delta float64, isReset, hourHasPrev bool) {
 	slot := at.Format(hourLayout)
 	n := len(k.Hours)
 	if n == 0 || k.Hours[n-1].Slot != slot {
@@ -218,6 +249,13 @@ func (s *Store) updateHourLocked(k *persist.TrendKey, at time.Time, ex Extracted
 		}
 		m.Last = cur
 		m.Samples++
+		// 用量记在「后一个样本所在的小时」里（跨小时的那段用量算给新小时），与当日口径一致
+		if hourHasPrev {
+			m.Gain += delta
+			if isReset {
+				m.Resets++
+			}
+		}
 	}
 	if ex.Balance != nil {
 		v := ex.Balance.Amount
