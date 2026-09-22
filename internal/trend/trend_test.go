@@ -119,6 +119,79 @@ func TestObserveGainAcrossWindowReset(t *testing.T) {
 	}
 }
 
+// Reset 是用户主动清理：除数据本身，必须把 Store 级的 prevPct/hasPct/lastAt 一起清掉，
+// 否则清理后的第一条样本会拿「清理前」的值当上一次，算出一个凭空多出来的用量。
+func TestResetClearsDataAndPrevState(t *testing.T) {
+	s, path := newTestStore(t)
+	d2 := day(2026, 9, 22)
+	t1 := time.Date(2026, 9, 21, 23, 55, 0, 0, time.Local)
+	s.Observe("zhipu-glm.k1", "GLM", "zhipu-glm", t1, zpBody(40))
+	s.Observe("zhipu-glm.k1", "GLM", "zhipu-glm", t1.Add(5*time.Minute), zpBody(55))
+	s.Observe("opencode.k2", "OC", "opencode", t1, ocBody(7))
+	if s.Loaded() != 2 {
+		t.Fatalf("清理前应有 2 个 Key，实际 %d", s.Loaded())
+	}
+
+	st, err := s.Reset(nil) // nil = 全部
+	if err != nil {
+		t.Fatalf("Reset 失败: %v", err)
+	}
+	if st.Keys != 2 || st.Days != 3 {
+		t.Errorf("清理规模 = %+v，期望 2 个 Key / 3 天（GLM 跨两天 + OC 一天）", st)
+	}
+	if s.Loaded() != 0 {
+		t.Errorf("内存里仍有 %d 个 Key", s.Loaded())
+	}
+	f, err := persist.LoadTrends(path)
+	if err != nil {
+		t.Fatalf("读盘失败: %v", err)
+	}
+	if f == nil || len(f.Keys) != 0 {
+		t.Errorf("文件里仍有数据: %+v", f)
+	}
+
+	// 关键：清理后的第一条样本必须从「没有上一次」开始 —— 用量 0、峰值 = 本次值，
+	// 绝不能拿清理前的 55 当上一次算出 55→42 的幻影增量。
+	s.Observe("zhipu-glm.k1", "GLM", "zhipu-glm", time.Date(2026, 9, 22, 10, 0, 0, 0, time.Local), zpBody(42))
+	kd := dayOf(t, s, "zhipu-glm.k1", d2)
+	if kd.Pct.Gain != 0 {
+		t.Errorf("清理后第一条样本的用量 = %v，期望 0（不得沿用清理前的值）", kd.Pct.Gain)
+	}
+	if kd.Pct.Peak != 42 {
+		t.Errorf("峰值 = %v，期望 42", kd.Pct.Peak)
+	}
+}
+
+// 只清一个 Key 时，其他 Key 的数据必须原样保留。
+func TestResetSingleKeyKeepsOthers(t *testing.T) {
+	s, _ := newTestStore(t)
+	at := time.Date(2026, 9, 22, 10, 0, 0, 0, time.Local)
+	s.Observe("opencode.a", "A", "opencode", at, ocBody(12))
+	s.Observe("opencode.b", "B", "opencode", at, ocBody(34))
+
+	st, err := s.Reset([]string{"opencode.a"})
+	if err != nil || st.Keys != 1 {
+		t.Fatalf("Reset 单 Key = %+v / %v，期望 1 个", st, err)
+	}
+	if s.Loaded() != 1 {
+		t.Fatalf("期望剩 1 个 Key，实际 %d", s.Loaded())
+	}
+	if _, ok := s.fileForTests().Keys["opencode.a"]; ok {
+		t.Error("被清理的 Key 还在")
+	}
+	if _, ok := s.fileForTests().Keys["opencode.b"]; !ok {
+		t.Error("未被清理的 Key 丢了")
+	}
+	// 清一个不存在的 id：幂等，不报错、不动别人
+	st2, err := s.Reset([]string{"nobody.k9"})
+	if err != nil || st2.Keys != 0 {
+		t.Errorf("清理不存在的 id 应为 0 且无错，实际 %+v / %v", st2, err)
+	}
+	if s.Loaded() != 1 {
+		t.Error("清理不存在的 id 时动了别的 Key")
+	}
+}
+
 // zpBody 造一份智谱 5 小时档的应答（percentage = v）。
 func zpBody(v float64) json.RawMessage {
 	return json.RawMessage(`{"data":{"limits":[{"unit":3,"number":5,"percentage":` +

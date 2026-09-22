@@ -63,6 +63,10 @@
   .status-line .dot.ok { background: var(--ok); }
   .status-line .dot.err { background: var(--err); }
   .status-line .dot.run { background: var(--warn); animation: pulse 1s infinite; }
+  /* 清空趋势数据：破坏性动作，平时弱化、悬停才变红，且靠右远离常规控件 */
+  .status-line .clearbtn { margin-left: auto; background: none; border: 1px solid var(--border); color: var(--muted);
+                           padding: 4px 10px; border-radius: 8px; font-size: 12.5px; }
+  .status-line .clearbtn:hover { color: var(--err); border-color: var(--err); }
   @keyframes pulse { 50% { opacity: .3; } }
   /* 导入差异预览表 */
   .diff-table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -341,6 +345,7 @@
 <div id="viewTrend" style="display:none">
   <div class="status-line">
     <span id="connTrend"><span class="dot"></span></span>
+    <button id="btnTrendClear" class="clearbtn" title="清空全部趋势数据（不可恢复）">清空趋势数据</button>
   </div>
   <div id="trendTip" class="ttip"></div>
   <div class="tlegend">
@@ -1387,6 +1392,29 @@ function trendKindOf(prov) {
   return String(prov.id || '').split('.')[0] === 'deepseek' ? 'balance' : 'percent';
 }
 function trendRangeOf(id) { return trendRange[id] || 'day'; }
+
+/* 清空趋势数据（用户 260922 要求由程序提供清理入口）。
+   存在的理由：口径修正后历史柱子无法重算（只存聚合值、不存原始样本），
+   必须给「清掉重来」的入口，而不是让人手工去删 trends.json。 */
+async function clearTrends() {
+  const ks = (trends && trends.keys) || [];
+  if (!ks.length) { toast('没有可清理的趋势数据'); return; }
+  const days = ks.reduce((a, k) => a + (k.total_days || 0), 0);
+  const msg = `清空全部趋势数据？\n\n`
+    + `将删除 ${ks.length} 个 API Key 的 ${days} 天记录（各时段的用量柱一并删除），不可恢复。\n`
+    + `清理后从下一次采集重新积累；趋势里不含 token，删除不影响你的 API Key 与配置。`;
+  if (!confirm(msg)) return;
+  try {
+    const j = await api('/api/trends/reset', { method: 'POST', body: '{}' });
+    trends = null;
+    await ensureTrends(true);
+    renderTrend();
+    toast(`已清空 ${j.keys} 个 API Key 的趋势数据（${j.days} 天 / ${j.hours} 个小时槽）`);
+  } catch (e) {
+    if (e && e.status === 401) openLogin('清空趋势数据需要管理员登录');
+    else toast('清理失败：' + ((e && e.message) || e));
+  }
+}
 
 /* ---------- 日期与数值工具（一律本地日期字符串：toISOString 是 UTC，会跨时区错一天） ---------- */
 function ymd(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
@@ -2632,6 +2660,7 @@ $('#stabService').onclick = () => switchSettingsTab('service');
 $('#stabAccount').onclick = () => switchSettingsTab('account');
 // 账户安全页不再有登录/登出按钮（入口统一在页面右上角），故此处无绑定
 $('#closeModalBtn').onclick = () => $('#settingsModal').classList.remove('open');
+$('#btnTrendClear').addEventListener('click', clearTrends);
 $('#settingsModal').addEventListener('click', e => { if (e.target === e.currentTarget) e.target.classList.remove('open'); });
 $('#saveBtn').onclick = saveSettings;
 // 导出 / 导入（v0.3.0）

@@ -121,6 +121,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /icons/{file}", s.handleIcon)
 	mux.HandleFunc("GET /api/quotas", s.handleQuotas)
 	mux.HandleFunc("GET /api/trends", s.handleTrends)
+	mux.HandleFunc("POST /api/trends/reset", s.requireWrite(s.handleResetTrends))
 	mux.HandleFunc("GET /api/config", s.handleGetConfig)
 	mux.HandleFunc("PUT /api/config", s.requireWrite(s.handlePutConfig))
 	mux.HandleFunc("POST /api/login", s.handleLogin)
@@ -341,6 +342,42 @@ func (s *Server) handleTrends(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, s.trends.Snapshot(time.Now(), days))
+}
+
+// handleResetTrends 清空趋势数据（admin）。body 可选 {"key":"<runtime id>"}，缺省 = 全部清空。
+//
+// 存在的理由：口径修正后，历史里按旧口径算出来的柱子**无法重算**（只存聚合值、不存原始样本），
+// 所以必须给用户一个「清掉重来」的入口，而不是让人手工去删 trends.json。
+func (s *Server) handleResetTrends(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Key string `json:"key"`
+	}
+	if r.Body != nil {
+		// 空 body 合法（= 全部清空）；解析失败也不当错误，按全部处理更安全？不——宁可报错，
+		// 免得「本意只清一个 Key」写错字段名却把全部清光。
+		if err := json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&body); err != nil && err != io.EOF {
+			writeErr(w, http.StatusBadRequest, "INVALID_REQUEST", "请求体不是合法 JSON")
+			return
+		}
+	}
+	scope := "全部"
+	ids := []string{}
+	if k := strings.TrimSpace(body.Key); k != "" {
+		ids = []string{k}
+		scope = k
+	}
+	if s.trends == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "keys": 0, "days": 0, "hours": 0})
+		return
+	}
+	st, err := s.trends.Reset(ids)
+	if err != nil {
+		logx.Warnf("清空趋势数据写盘失败（内存已清、重启后会读回旧文件）: %v", err)
+		writeErr(w, http.StatusInternalServerError, "TRENDS_RESET_FAILED", "趋势数据已从内存清除，但写盘失败")
+		return
+	}
+	logx.Infof("清空趋势数据（%s）：%d 个 API Key / %d 天 / %d 个小时槽", scope, st.Keys, st.Days, st.Hours)
+	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "keys": st.Keys, "days": st.Days, "hours": st.Hours})
 }
 
 // purgeRemovedTrends 清理「已被删掉的 API Key」的趋势数据（用户需求 3）。

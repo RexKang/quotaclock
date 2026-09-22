@@ -349,6 +349,53 @@ func (s *Store) Purge(ids []string) ([]string, error) {
 	return removed, nil
 }
 
+// ResetStats 一次清理的规模（日志、界面提示与测试断言用）。
+type ResetStats struct {
+	Keys  int // 被清空的 API Key 数
+	Days  int // 删除的日聚合条数
+	Hours int // 删除的小时槽条数
+}
+
+// Reset 清空趋势数据：ids 为空 = 全部；否则只清指定的 runtime id（不存在的 id 静默忽略）。
+//
+// 与 Purge（删 AK 连带清理）的关键区别：Reset 是**用户主动清理**，除数据本身还必须清掉
+// Store 级的 prevPct / hasPct / lastAt。否则清理之后的第一条样本会拿「清理前」的值当上一次，
+// 算出一个凭空多出来的用量（幻影增量）—— 那正是用户要清掉的那类错数。
+func (s *Store) Reset(ids []string) (ResetStats, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var st ResetStats
+	targets := ids
+	if len(targets) == 0 {
+		targets = make([]string, 0, len(s.file.Keys))
+		for id := range s.file.Keys {
+			targets = append(targets, id)
+		}
+	}
+	for _, id := range targets {
+		if k, ok := s.file.Keys[id]; ok && k != nil {
+			st.Keys++
+			st.Days += len(k.Days)
+			st.Hours += len(k.Hours)
+			delete(s.file.Keys, id)
+		}
+		// 不管这个 id 有没有数据，上一状态一律清掉（清完后的第一条样本要当作全新时代的起点）
+		delete(s.lastAt, id)
+		delete(s.prevPct, id)
+		delete(s.hasPct, id)
+		s.dirty = true
+	}
+	if st.Keys == 0 {
+		return st, nil
+	}
+	if err := s.flushLocked(); err != nil {
+		// 与 Purge 同一处置：内存已清、文件没写成 → 告警但不当失败（重启后会再读回旧文件）
+		return st, err
+	}
+	return st, nil
+}
+
 // pathsForTests 仅供包内测试观察文件形态。
 func (s *Store) fileForTests() *persist.TrendsFile {
 	s.mu.Lock()

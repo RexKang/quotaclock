@@ -947,6 +947,29 @@ def scenario_trends(binpath, mock):
         blob = json.dumps(saved)
         check("趋势文件不含 token 明文/密文（只有指标）",
               "sk-e2e-keep-1234" not in blob and "sk-e2e-gone-5678" not in blob and "token_cipher" not in blob)
+
+        # ---- 清空趋势数据（POST /api/trends/reset）：admin 才能调，且要真清到文件 ----
+        code, _, _ = http("POST", base + "/api/trends/reset", {"key": ""})
+        check("清空前未登录调用被拒（401）", code == 401, str(code))
+        code, _, body = http("POST", base + "/api/trends/reset", {"key": ""}, auth)   # http() 返回 (status, headers, body)
+        check("清空全部：200 且返回计数", code == 200 and body.get("keys", 0) >= 1, str(body))
+        _, _, tv3 = http("GET", base + "/api/trends")
+        check("清空后视图里没有 Key", not tv3["keys"], json.dumps([k["id"] for k in tv3["keys"]]))
+        with open(seed_path, encoding="utf-8") as f:
+            saved2 = json.load(f)
+        check("清空后文件里没有 Key", not (saved2.get("keys") or {}),
+              json.dumps(list((saved2.get("keys") or {}).keys())))
+        check("清空动作有 INFO 日志", "清空趋势数据" in inst.log())
+        # 重新采集一次：清理后的第一条样本必须从「没有上一次」开始（用量 0、峰值 = 本次值）
+        time.sleep(2)
+        _, _, tv4 = http("GET", base + "/api/trends")
+        for k0 in tv4["keys"]:
+            today = [x for x in k0["daily"] if x]
+            if today:
+                pct = (today[-1] or {}).get("pct") or {}
+                check("清空后重新采集：用量从 0 起算（不沿用清理前的值）", pct.get("gain", 1) == 0,
+                      json.dumps(pct))
+
     finally:
         inst.kill()
 
