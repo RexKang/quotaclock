@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/RexKang/QuotaClock/internal/config"
-	"github.com/RexKang/QuotaClock/internal/logx"
+	"github.com/RexKang/quotaclock/internal/config"
+	"github.com/RexKang/quotaclock/internal/logx"
 )
 
 // OutboundTimeout 出站超时：连接与总时长均 25s（PRD §5，沿用 v0.1 代理值）。

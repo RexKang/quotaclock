@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/RexKang/QuotaClock/internal/config"
+	"github.com/RexKang/quotaclock/internal/config"
 )
 
 // classifyTable C-col-01：分类器表逐一归入 §7.2 对应分类。

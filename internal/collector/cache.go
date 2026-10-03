@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/RexKang/QuotaClock/internal/config"
-	"github.com/RexKang/QuotaClock/internal/logx"
-	"github.com/RexKang/QuotaClock/internal/persist"
+	"github.com/RexKang/quotaclock/internal/config"
+	"github.com/RexKang/quotaclock/internal/logx"
+	"github.com/RexKang/quotaclock/internal/persist"
 )
 
 // CacheWriter 缓存落盘出口（persist.CacheWriter 实现）。nil = 不启用缓存。

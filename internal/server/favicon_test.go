@@ -5,7 +5,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/RexKang/QuotaClock/web"
+	"github.com/RexKang/quotaclock/web"
 )
 
 func TestFaviconAndIcons(t *testing.T) {

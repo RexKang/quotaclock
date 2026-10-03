@@ -4,8 +4,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/RexKang/QuotaClock/internal/crypto"
-	"github.com/RexKang/QuotaClock/internal/logx"
+	"github.com/RexKang/quotaclock/internal/crypto"
+	"github.com/RexKang/quotaclock/internal/logx"
 )
 
 // Sessions 管理员会话：HKDF 签名的 {sid, exp} 无状态令牌（重启不失效）+ 内存拒绝名单

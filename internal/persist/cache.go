@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/RexKang/QuotaClock/internal/logx"
+	"github.com/RexKang/quotaclock/internal/logx"
 )
 
 // CacheName 上次成功采集数据快照文件（v0.2.4 新增白名单项，写盘白名单第 4 类）。

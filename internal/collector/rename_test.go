@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/RexKang/QuotaClock/internal/config"
+	"github.com/RexKang/quotaclock/internal/config"
 )
 
 // TestRenameKeyKeepsCollectedState（v0.2.5 r4.1 回归）：只改 API Key 的名称不该重新采集。

@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/RexKang/QuotaClock/internal/persist"
+	"github.com/RexKang/quotaclock/internal/persist"
 )
 
 // ---------- 真实应答形状（取自用户实例 2026-09-22 的快照，勿手改，它们是回归基准） ----------

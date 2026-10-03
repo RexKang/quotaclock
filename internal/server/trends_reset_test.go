@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/RexKang/QuotaClock/internal/config"
-	"github.com/RexKang/QuotaClock/internal/persist"
+	"github.com/RexKang/quotaclock/internal/config"
+	"github.com/RexKang/quotaclock/internal/persist"
 )
 
 // POST /api/trends/reset 的契约：admin 才能调；缺省清全部；{"key":...} 只清一个；

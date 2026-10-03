@@ -15,13 +15,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/RexKang/QuotaClock/internal/collector"
-	"github.com/RexKang/QuotaClock/internal/config"
-	"github.com/RexKang/QuotaClock/internal/crypto"
-	"github.com/RexKang/QuotaClock/internal/logx"
-	"github.com/RexKang/QuotaClock/internal/persist"
-	"github.com/RexKang/QuotaClock/internal/trend"
-	"github.com/RexKang/QuotaClock/web"
+	"github.com/RexKang/quotaclock/internal/collector"
+	"github.com/RexKang/quotaclock/internal/config"
+	"github.com/RexKang/quotaclock/internal/crypto"
+	"github.com/RexKang/quotaclock/internal/logx"
+	"github.com/RexKang/quotaclock/internal/persist"
+	"github.com/RexKang/quotaclock/internal/trend"
+	"github.com/RexKang/quotaclock/web"
 )
 
 // testEnv 进程内全链路测试环境：真实 persist/key/session + httptest。

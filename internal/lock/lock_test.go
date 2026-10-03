@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/RexKang/QuotaClock/internal/persist"
+	"github.com/RexKang/quotaclock/internal/persist"
 	"strings"
 	"testing"
 )

@@ -8,8 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/RexKang/QuotaClock/internal/config"
-	"github.com/RexKang/QuotaClock/internal/logx"
+	"github.com/RexKang/quotaclock/internal/config"
+	"github.com/RexKang/quotaclock/internal/logx"
 )
 
 // Scheduler 采集调度器：单 goroutine 串行 tick 循环（设计 §7.1），

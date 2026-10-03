@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/RexKang/QuotaClock/internal/config"
-	"github.com/RexKang/QuotaClock/internal/crypto"
+	"github.com/RexKang/quotaclock/internal/config"
+	"github.com/RexKang/quotaclock/internal/crypto"
 )
 
 // TestPutNewKeyRequiresToken（v0.2.5）：新增凭据必须带 token；已存在凭据（含迁移产出的

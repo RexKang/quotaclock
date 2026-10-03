@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/RexKang/QuotaClock/internal/crypto"
+	"github.com/RexKang/quotaclock/internal/crypto"
 )
 
 // FX-2：v0.1 导出 JSON（version 2）脱敏版——结构与真实 old-config.json 一致，token 为占位。

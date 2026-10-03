@@ -4,7 +4,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/RexKang/QuotaClock/internal/persist"
+	"github.com/RexKang/quotaclock/internal/persist"
 )
 
 // 视图窗口（GET /api/trends 的入参与出参规模）。

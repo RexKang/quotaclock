@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/RexKang/QuotaClock/internal/config"
+	"github.com/RexKang/quotaclock/internal/config"
 )
 
 // ---------- v0.2.5 双层调度：同平台多 key 等分错峰 ----------

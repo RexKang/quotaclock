@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/RexKang/QuotaClock/internal/config"
-	"github.com/RexKang/QuotaClock/internal/crypto"
+	"github.com/RexKang/quotaclock/internal/config"
+	"github.com/RexKang/quotaclock/internal/crypto"
 )
 
 func TestAtomicWriteNormal(t *testing.T) { // C-per-01

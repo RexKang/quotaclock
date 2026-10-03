@@ -6,7 +6,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/RexKang/QuotaClock/internal/logx"
+	"github.com/RexKang/quotaclock/internal/logx"
 )
 
 // Platform 内置平台预设（v0.2.5）：base_url / paths / 鉴权方式 / 额外请求头全部由代码内置，

@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/RexKang/QuotaClock/internal/collector"
-	"github.com/RexKang/QuotaClock/internal/config"
+	"github.com/RexKang/quotaclock/internal/collector"
+	"github.com/RexKang/quotaclock/internal/config"
 )
 
 // putKey 一次性 PUT 单平台单凭据配置（enabled 显式给值；新增凭据必须带 token，v0.2.5）。

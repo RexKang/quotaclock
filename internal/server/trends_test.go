@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/RexKang/QuotaClock/internal/config"
-	"github.com/RexKang/QuotaClock/internal/crypto"
-	"github.com/RexKang/QuotaClock/internal/persist"
+	"github.com/RexKang/quotaclock/internal/config"
+	"github.com/RexKang/quotaclock/internal/crypto"
+	"github.com/RexKang/quotaclock/internal/persist"
 )
 
 // newTrendsEnv 造「两个 OpenCode Key」的环境（趋势数据用 keyID = a / b，断言直观）。

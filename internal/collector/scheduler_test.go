@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/RexKang/QuotaClock/internal/config"
+	"github.com/RexKang/quotaclock/internal/config"
 )
 
 func rtConfig(interval, sMin, sMax int) *config.Collector {

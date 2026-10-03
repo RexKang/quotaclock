@@ -1,7 +1,7 @@
 package config
 
 import (
-	"github.com/RexKang/QuotaClock/internal/crypto"
+	"github.com/RexKang/quotaclock/internal/crypto"
 )
 
 // BuildRuntime 把落盘形态转为运行时视图：按平台预设展开 base_url/paths/auth_style，

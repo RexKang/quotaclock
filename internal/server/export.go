@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/RexKang/QuotaClock/internal/config"
-	"github.com/RexKang/QuotaClock/internal/crypto"
-	"github.com/RexKang/QuotaClock/internal/logx"
+	"github.com/RexKang/quotaclock/internal/config"
+	"github.com/RexKang/quotaclock/internal/crypto"
+	"github.com/RexKang/quotaclock/internal/logx"
 )
 
 // handleExportConfig GET /api/config/export（v0.3.0）

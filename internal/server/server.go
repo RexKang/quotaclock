@@ -12,12 +12,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/RexKang/QuotaClock/internal/collector"
-	"github.com/RexKang/QuotaClock/internal/config"
-	"github.com/RexKang/QuotaClock/internal/crypto"
-	"github.com/RexKang/QuotaClock/internal/logx"
-	"github.com/RexKang/QuotaClock/internal/persist"
-	"github.com/RexKang/QuotaClock/internal/trend"
+	"github.com/RexKang/quotaclock/internal/collector"
+	"github.com/RexKang/quotaclock/internal/config"
+	"github.com/RexKang/quotaclock/internal/crypto"
+	"github.com/RexKang/quotaclock/internal/logx"
+	"github.com/RexKang/quotaclock/internal/persist"
+	"github.com/RexKang/quotaclock/internal/trend"
 
 	"golang.org/x/crypto/bcrypt"
 )

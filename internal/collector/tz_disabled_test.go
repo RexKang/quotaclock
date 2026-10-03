@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/RexKang/QuotaClock/internal/config"
-	"github.com/RexKang/QuotaClock/internal/persist"
+	"github.com/RexKang/quotaclock/internal/config"
+	"github.com/RexKang/quotaclock/internal/persist"
 )
 
 // TestRestoreFromCacheKeepsZone（v0.2.5 回归）：缓存恢复不得改写时区。

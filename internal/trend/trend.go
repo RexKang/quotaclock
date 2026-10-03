@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/RexKang/QuotaClock/internal/logx"
-	"github.com/RexKang/QuotaClock/internal/persist"
+	"github.com/RexKang/quotaclock/internal/logx"
+	"github.com/RexKang/quotaclock/internal/persist"
 )
 
 // 聚合与保留策略（常量集中在此，便于核对存储量）。

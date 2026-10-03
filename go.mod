@@ -1,4 +1,4 @@
-module github.com/RexKang/QuotaClock
+module github.com/RexKang/quotaclock
 
 go 1.26.0
 

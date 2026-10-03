@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/RexKang/QuotaClock/internal/config"
+	"github.com/RexKang/quotaclock/internal/config"
 )
 
 // countingReader 记录被读走的字节数（断言 handler 是否读干请求体）。

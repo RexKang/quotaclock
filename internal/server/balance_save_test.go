@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/RexKang/QuotaClock/internal/config"
+	"github.com/RexKang/quotaclock/internal/config"
 )
 
 // TestSaveConfigKeepsBalance（v0.3.0 回归）：PUT 带 balance 必须落盘。

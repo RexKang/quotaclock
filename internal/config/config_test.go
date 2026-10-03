@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/RexKang/QuotaClock/internal/crypto"
+	"github.com/RexKang/quotaclock/internal/crypto"
 )
 
 // validPut 返回一份合法 PUT 基准样本（各规则用例在其上做单项变异）。

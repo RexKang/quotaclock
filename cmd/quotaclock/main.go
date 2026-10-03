@@ -16,15 +16,15 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/RexKang/QuotaClock/internal/collector"
-	"github.com/RexKang/QuotaClock/internal/config"
-	"github.com/RexKang/QuotaClock/internal/crypto"
-	"github.com/RexKang/QuotaClock/internal/lock"
-	"github.com/RexKang/QuotaClock/internal/logx"
-	"github.com/RexKang/QuotaClock/internal/persist"
-	"github.com/RexKang/QuotaClock/internal/server"
-	"github.com/RexKang/QuotaClock/internal/trend"
-	"github.com/RexKang/QuotaClock/web"
+	"github.com/RexKang/quotaclock/internal/collector"
+	"github.com/RexKang/quotaclock/internal/config"
+	"github.com/RexKang/quotaclock/internal/crypto"
+	"github.com/RexKang/quotaclock/internal/lock"
+	"github.com/RexKang/quotaclock/internal/logx"
+	"github.com/RexKang/quotaclock/internal/persist"
+	"github.com/RexKang/quotaclock/internal/server"
+	"github.com/RexKang/quotaclock/internal/trend"
+	"github.com/RexKang/quotaclock/web"
 )
 
 // version 由 -ldflags -X main.version=... 编译期注入。
