@@ -68,7 +68,9 @@ func TestTrendsEndpoint(t *testing.T) {
 	}
 
 	// 无鉴权也能读（与 /api/quotas 同级；敏感物只有 token，不在这里）
-	at := time.Date(2026, 9, 22, 9, 0, 0, 0, time.Local)
+	// 样本时间必须用「运行当天」：此处断言的是「daily 末位 = 今天」的窗口对齐 +
+	// 「采到即可见」。写死日期会让断言只在编写当天成立——隔天再跑必红。
+	at := time.Now()
 	seedTrends(env, at)
 	ids, byID := trendKeyIDs(t, env)
 	if len(ids) != 2 || ids[0] != "opencode.a" || ids[1] != "opencode.b" {
@@ -88,8 +90,8 @@ func TestTrendsEndpoint(t *testing.T) {
 	if hours, _ := kv["hours"].([]any); len(hours) != 48 {
 		t.Errorf("hours 长度 = %d，期望 48", len(hours))
 	}
-	if kv["total_days"] != float64(1) || kv["first_day"] != "2026-09-22" {
-		t.Errorf("累计天数/起始日 = %v / %v", kv["total_days"], kv["first_day"])
+	if today := at.Format("2006-01-02"); kv["total_days"] != float64(1) || kv["first_day"] != today {
+		t.Errorf("累计天数/起始日 = %v / %v（期望 1 / %s）", kv["total_days"], kv["first_day"], today)
 	}
 
 	// days 参数：合法值生效，非法值 400（不猜）
