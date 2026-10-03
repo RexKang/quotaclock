@@ -5,23 +5,25 @@
 后台常驻采集器定时拉取各平台用量，浏览器访问 `http://127.0.0.1:8787` 即可打开看板，
 无需任何本地配置；一份服务端配置全设备共享。
 
-![Version](https://img.shields.io/badge/Version-0.2.5-blue)
+![Version](https://img.shields.io/badge/Version-0.4.0-blue)
 ![Platform](https://img.shields.io/badge/Platform-智谱%20%7C%20DeepSeek%20%7C%20Kimi%20%7C%20OpenCode-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
 ## 功能
 
 - **多平台额度总览**：智谱 GLM / DeepSeek / Kimi Code / OpenCode 四个内置平台，**只能选平台、只需填 API Key**（接口地址与请求路径由程序内置，避免填错地址却看不出问题）
+- **趋势页（用量历史）**：每个在采 API Key 一张卡，区间切换「当日 / 7 日 / 月度 / 季度 / 年度」，**柱高 = 该时段的实际用量**（额度平台为百分比增量之和，DeepSeek 为实际消费）；0 值不画柱、连续没采样画成淡色区段，悬停按 x 吸附出明细。数据每小时落盘 `trends.json`（只存聚合指标，不含 token），删 Key 连带清理，趋势页也有「清空趋势数据」入口
+- **深浅色主题**：页头最右侧的 🌗 按钮一键切换（深色显示太阳、浅色显示月亮），选择存 localStorage、刷新不闪色；默认深色
 - **同平台多 API Key**：一个平台可挂任意多个 Key，采集按「基准间隔 ÷ Key 数」等分错开、同平台请求串行化——多个 Key 互不冲突
 - **后台常驻采集**：默认每个 Key 300s + 5~25s 抖动定时拉取，平台间 1~5s 错峰；页面只读服务端缓存
 - **上次成功数据缓存**：每次成功采集后写入 `cache.json`，**重启服务端后页面立刻显示上次数据**（徽标「缓存数据」，首轮采集到了自动转「正常」），不再回到空白等待
-- **凭据可停用**：设置里取消勾选某个 Key 的「启用」即停采，并从首页/详情隐藏（状态行提示「N 个已停用，未显示」），比删掉再重建更省事
+- **凭据可停用**：设置里取消勾选某个 Key 的「启用」即停采，并从首页/接口页隐藏（状态行提示「N 个已停用，未显示」），比删掉再重建更省事
 - **失败语义区分**：token 失效红字提示并停采该 Key；平台异常（5xx/网络）暂停该平台全部 Key 并指数退避（×2 封顶 30min），单 Key 限流（429）按 Retry-After 顺延且只停该 Key
 - **配置加密落盘**：token 以 AES-256-GCM 加密存 `config.json`，密钥为随机生成的 `key.bin`，配置与日志中永不出现明文
 - **时间用本地时区**：看板上的时间戳按运行机器的本地时区显示
 - **两档鉴权**：`admin`（查看公开、修改须登录）/ `none`（全开放，本机自用）
 - **设置分三个标签**：「平台管理」（平台 + API Key 列表）、「采集与服务」（采集间隔、监听 IP / 端口）与「账户安全」（鉴权模式/改密码/登录态）
-- **页头按钮固定顺序**：刷新 / 设置 / 登出（未登录时第三位为「登录」）；登出只在这里，设置弹窗里不再重复放一个
+- **页头按钮固定顺序**：刷新 / 设置 / 登出 / 主题切换（未登录时「登录」顶替「设置 / 登出」的位置）；登出只在这里，设置弹窗里不再重复放一个
 - **采集状态一眼分清**：卡片徽标有「等待采集」（新加的 Key 或服务端刚起、还没采到）、「采集异常」（平台限流 429，等等就好，带重试倒计时）、「采集失败」（5xx / 超时 / 网络 / 业务失败，带重试倒计时）、「缓存数据」（显示上次成功采集的数据）、「已停用」、「Key 失效」
 - **先测通再保存**：新增的 API Key 不用先保存就能点「测试」；新增的 Key 不允许留空（前后端都会拦），已保存过的 Key 留空 = 保留原值
 - **配置导出 / 导入**：在设置里导出可读 JSON（**默认含明文 API Key**），拷到另一台机器导入即可——到新机器只改不一样的那几个 Key，不用重配已有的（token 与本机 `key.bin` 绑定，直接拷 `config.json` 是解不开的）。导入前先看差异预览，确认后全量替换并热生效。**文件含明文凭据，导入后请尽快删除**
@@ -44,7 +46,7 @@ quotaclock.exe            # Windows（双击亦可）
 ```
 2026-09-05 19:00:00 [INFO] 已生成模板配置 ...\config.json（默认密码 Quota@2026090S，请尽快修改）
 2026-09-05 19:00:00 [WARN] 正在使用默认密码，请立即修改
-2026-09-05 19:00:00 [INFO] QuotaClock v0.2.5 已启动 | 监听 http://127.0.0.1:8787 | auth=admin | ...
+2026-09-05 19:00:00 [INFO] QuotaClock v0.4.0 已启动 | 监听 http://127.0.0.1:8787 | auth=admin | ...
 2026-09-05 19:00:00 [INFO] 已在浏览器打开 http://127.0.0.1:8787
 ```
 
@@ -122,12 +124,12 @@ v0.1 的 `enabled=false` 平台**导入并保持停用**（停用凭据不采集
 ```
 
 - 推荐在设置页修改（保存即原子写盘 + 热生效）；token 留空 = 保留原值
-- `enabled` 缺省即启用；停用的**凭据**不参与采集、不在首页/详情页出现
+- `enabled` 缺省即启用；停用的**凭据**不参与采集、不在首页/接口页出现
 - **同一平台多个 Key**：每轮采集里它们的启动时刻按 `interval_base_s ÷ Key 数` 等分错开（例：300s + 2 个 Key → 相隔 150s），各自仍是 300s 一轮
 - `balance` 只影响看板渲染（余额型平台的红黄绿档位），不参与采集；留空或写 0 = 用默认值
 - 手工编辑 `config.json` 亦受支持，但请先停止程序（运行中保存会覆盖手改）
 - **换机器 / 换平台**：不要直接拷 `config.json`（里面的 token 用本机 `key.bin` 加密，到别的机器解不开）——用设置里的「导出配置」拿到可读 JSON，到新机器「导入配置」即可；导入后请删除导出文件（含明文 Key）
-- `config.json` / `config.json.v*.bak`（迁移前自动备份）/ `key.bin` / `quotaclock-*.lock` / `cache.json` 为运行时文件，已列入 .gitignore，切勿外传
+- `config.json` / `config.json.v*.bak`（迁移前自动备份）/ `key.bin` / `quotaclock-*.lock` / `cache.json` / `trends.json` 为运行时文件，已列入 .gitignore，切勿外传
 - **回退旧版本**：升级时已自动留了 `config.json.v<N>.bak`——把它改名回 `config.json` 再换回旧版二进制即可；若已在旧版本上手改过配置，删除 version 4 的 `config.json` 重新录入亦可
 
 ## 启动参数
@@ -198,7 +200,7 @@ quotaclock -admin-password 新密码
 ## 隐私与安全
 
 - token 明文只存在于内存；落盘为 AES-256-GCM 密文；日志全链路脱敏（明文/密文/掩码/会话 cookie 永不入日志）
-- 后端只读硬约束：唯一写路径是配置保存；文件系统白名单仅 `config.json` / `key.bin` / 锁文件 / `cache.json`（仅存展示数据，不含 token）/ `*.tmp`
+- 后端只读硬约束：唯一写路径是配置保存；文件系统白名单仅 `config.json` / `key.bin` / 锁文件 / `cache.json`（仅存展示数据，不含 token）/ `trends.json`（仅存趋势聚合指标，不含 token）/ `*.tmp`
 - 会话 cookie：HttpOnly + SameSite=Lax，7 天有效；登出立即失效（重启后旧登出 cookie 至多存活至自然过期，单管理员场景已接受的取舍）
 - CORS 红线：服务端不发送任何 CORS 头；`/api/login` 仅接受 JSON（CSRF 三道防线）
 - `auth.mode=none` 表示全开放（任何可访问者可查看/修改配置），页面顶部常驻警示
@@ -211,13 +213,13 @@ quotaclock -admin-password 新密码
 OpenCode 用的是官方用量接口（`GET /zen/go/v1/usage`，Bearer API Key）。
 
 **怎么看原始返回？**
-「详情」页可查看每个 API Key 的状态、上次成功采集时间与原始 JSON。
+「接口」页可查看每个 API Key 的状态、上次成功采集时间与原始 JSON（原「详情」页，v0.4.0 改名）；日常看用量用「总览」和「趋势」。
 
 **重启后卡片显示「缓存数据」？**
 那是在读上次成功采集的结果（`cache.json`），首轮采集一到就会转「正常」；想强制立即刷新，点页面右上「刷新」。
 
-**首页 / 详情少了某个 Key？**
-停用的凭据不在首页和详情页显示。到「设置 → 平台管理」勾选该 Key 的「启用」即可恢复（平台上会显示「停用」标记）。
+**首页 / 接口页少了某个 Key？**
+停用的凭据不在首页和接口页显示。到「设置 → 平台管理」勾选该 Key 的「启用」即可恢复（平台上会显示「停用」标记）。
 
 **能加新的平台吗？**
 不能——只支持智谱 GLM / DeepSeek / Kimi Code / OpenCode 四个内置平台。这四家的返回结构各有各的字段，
@@ -242,7 +244,7 @@ OpenCode 用的是官方用量接口（`GET /zen/go/v1/usage`，Bearer API Key�
 ## 构建
 
 ```bash
-go build -ldflags "-s -w -X main.version=v0.2.5" -o quotaclock ./cmd/quotaclock
+go build -ldflags "-s -w -X main.version=v0.4.0" -o quotaclock ./cmd/quotaclock
 go test ./...                        # 单元 + 集成（-race 建议）
 python scripts/e2e.py ./quotaclock   # E2E 演练（需要 python3）
 ```
@@ -261,10 +263,10 @@ QUOTACLOCK_UPSTREAM_OVERRIDE=http://127.0.0.1:8899 ./quotaclock -port 8797   # �
 ```bash
 # 1. 先写 CHANGELOG.md：把当前版本的小节从「未发布」改成发布日期，写清新增/变更/修复
 # 2. 本地预览这次会生成的 Release 正文（不推任何东西）
-python scripts/release_notes.py v0.2.5
+python scripts/release_notes.py v0.4.0
 # 3. 打标签并推送（CI 自动：go vet → go test -race → 三平台产物 → 建 Release）
-git tag -a v0.2.5 -m "v0.2.5 …"   # 标签注释也会留在 git 里，方便 git tag -n99 查看
-git push origin v0.2.5
+git tag -a v0.4.0 -m "v0.4.0 …"   # 标签注释也会留在 git 里，方便 git tag -n99 查看
+git push origin v0.4.0
 ```
 
 Release 正文 = 按版本给出的下载说明 + **CHANGELOG.md 里该版本的小节（本版重点）** + 两版之间的提交明细（按新增/修复/性能/重构分组，去掉 40 位 SHA，`docs:`/`chore:`/`test:` 不进正文）。CI 里由 `scripts/release_notes.py` 生成后交给 `goreleaser --release-notes`，见 `.github/workflows/ci.yml`；CI 带 `--strict`——**CHANGELOG 里没写这个版本，发布直接失败**（避免又发一条「看起来都一样」的说明）。
