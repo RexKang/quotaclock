@@ -159,7 +159,7 @@ v0.1 的 `enabled=false` 平台**导入并保持停用**（停用凭据不采集
 
 ### 常驻运行
 
-把二进制放到 `/opt/quotaclock/` 后，执行这份脚本完成 systemd 常驻配置（创建系统用户、目录权限、服务文件与启动）：
+把二进制放到 `/opt/quotaclock/` 后，执行这份脚本完成 systemd 常驻配置（创建系统用户、权限、服务文件与启动；二进制归 root，程序数据统一写入 `/opt/quotaclock/data/`）：
 
 ```bash
 #!/bin/bash
@@ -180,12 +180,16 @@ sudo useradd --system \
   quotaclock 2>/dev/null || true
 
 # 2. 设置 /opt/quotaclock 归属和权限
-#    程序要在这里写 key.bin，所以目录 owner 给 quotaclock
+#    二进制与目录结构归 root：服务用户不可写自身可执行文件、不能增删目录条目；
+#    程序要写 key.bin / config.json / cache.json / trends.json —— 统一放 data/ 子目录，归 quotaclock
 echo "[2/5] 设置 /opt/quotaclock 权限 ..."
-sudo chown -R quotaclock:quotaclock /opt/quotaclock
-sudo chmod 750 /opt/quotaclock
-sudo chmod 750 /opt/quotaclock/quotaclock
-[ -f /opt/quotaclock/config.json ] && sudo chmod 640 /opt/quotaclock/config.json
+sudo mkdir -p /opt/quotaclock/data
+sudo chown quotaclock:quotaclock /opt/quotaclock/data
+sudo chmod 750 /opt/quotaclock/data
+sudo chown root:root /opt/quotaclock /opt/quotaclock/quotaclock
+sudo chmod 755 /opt/quotaclock
+sudo chmod 755 /opt/quotaclock/quotaclock
+[ -f /opt/quotaclock/data/config.json ] && sudo chmod 640 /opt/quotaclock/data/config.json
 
 # 3. 写入 systemd 服务文件
 echo "[3/5] 写入 /etc/systemd/system/quotaclock.service ..."
@@ -199,7 +203,7 @@ Type=simple
 User=quotaclock
 Group=quotaclock
 WorkingDirectory=/opt/quotaclock
-ExecStart=/opt/quotaclock/quotaclock -config /opt/quotaclock/config.json
+ExecStart=/opt/quotaclock/quotaclock -config /opt/quotaclock/data/config.json
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal
