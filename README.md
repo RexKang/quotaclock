@@ -159,12 +159,68 @@ v0.1 的 `enabled=false` 平台**导入并保持停用**（停用凭据不采集
 
 ### 常驻运行
 
-```ini
-# Linux systemd 示例
+把二进制放到 `/opt/quotaclock/` 后，执行这份脚本完成 systemd 常驻配置（创建系统用户、目录权限、服务文件与启动）：
+
+```bash
+#!/bin/bash
+set -e
+
+# ============================================================
+# QuotaClock systemd 服务一键部署
+# ============================================================
+
+# 1. 创建系统用户和组（已存在则忽略）
+echo "[1/5] 创建系统用户 quotaclock ..."
+sudo groupadd --system quotaclock 2>/dev/null || true
+sudo useradd --system \
+  --gid quotaclock \
+  --home-dir /opt/quotaclock \
+  --no-create-home \
+  --shell /usr/sbin/nologin \
+  quotaclock 2>/dev/null || true
+
+# 2. 设置 /opt/quotaclock 归属和权限
+#    程序要在这里写 key.bin，所以目录 owner 给 quotaclock
+echo "[2/5] 设置 /opt/quotaclock 权限 ..."
+sudo chown -R quotaclock:quotaclock /opt/quotaclock
+sudo chmod 750 /opt/quotaclock
+sudo chmod 750 /opt/quotaclock/quotaclock
+[ -f /opt/quotaclock/config.json ] && sudo chmod 640 /opt/quotaclock/config.json
+
+# 3. 写入 systemd 服务文件
+echo "[3/5] 写入 /etc/systemd/system/quotaclock.service ..."
+sudo tee /etc/systemd/system/quotaclock.service > /dev/null <<'EOF'
+[Unit]
+Description=QuotaClock Service
+After=network.target
+
 [Service]
+Type=simple
+User=quotaclock
+Group=quotaclock
+WorkingDirectory=/opt/quotaclock
 ExecStart=/opt/quotaclock/quotaclock -config /opt/quotaclock/config.json
 Restart=on-failure
-# 日志走 stdout，journald 自动收集；建议绝对路径启动
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# 4. reload 并启动
+echo "[4/5] 重载 systemd 并启动服务 ..."
+sudo systemctl daemon-reload
+sudo systemctl enable --now quotaclock
+
+# 5. 查看状态和日志
+echo "[5/5] 当前状态："
+sleep 1
+sudo systemctl status quotaclock --no-pager || true
+echo
+echo "===== 最近 30 行日志 ====="
+journalctl -u quotaclock -n 30 --no-pager || true
 ```
 
 ```powershell
