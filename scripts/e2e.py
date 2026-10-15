@@ -889,7 +889,7 @@ def scenario_trends(binpath, mock):
         check("趋势接口公开可读（与 /api/quotas 同级）", code == 200, str(code))
         check("预置趋势数据可见", any(k["id"] == "opencode.gone" for k in tv["keys"]), json.dumps(tv["keys"])[:160])
         check("daily 定长连续（默认 400 天）", len(tv["keys"][0]["daily"]) == 400, len(tv["keys"][0]["daily"]))
-        check("hours 定长连续（48 槽）", len(tv["keys"][0]["hours"]) == 48, len(tv["keys"][0]["hours"]))
+        check("hours 定长连续（168 槽）", len(tv["keys"][0]["hours"]) == 168, len(tv["keys"][0]["hours"]))
         check("缺数据的槽位是 null（不画成 0）",
               sum(1 for x in tv["keys"][0]["daily"] if x is None) == 399,
               json.dumps(tv["keys"][0]["daily"])[:120])

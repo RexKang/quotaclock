@@ -359,8 +359,8 @@ func TestSnapshotContiguousSlotsWithNulls(t *testing.T) {
 		if len(k.Daily) != 7 {
 			t.Errorf("%s：daily 长度 = %d，期望 7（定长连续，前端不必自己对齐日期）", k.ID, len(k.Daily))
 		}
-		if len(k.Hours) != 48 {
-			t.Errorf("%s：hours 长度 = %d，期望 48", k.ID, len(k.Hours))
+		if len(k.Hours) != 168 {
+			t.Errorf("%s：hours 长度 = %d，期望 168", k.ID, len(k.Hours))
 		}
 		if k.Daily[6] == nil && k.ID == "kimi-code.m1" {
 			t.Error("今天那条不该为空")
@@ -373,7 +373,7 @@ func TestSnapshotContiguousSlotsWithNulls(t *testing.T) {
 	if z.Daily[5] == nil || z.Daily[6] != nil {
 		t.Error("只有 09-21 那格该有数据（09-20 更早、09-22 今天都没采到）")
 	}
-	if z.Hours[48-1] != nil {
+	if z.Hours[168-1] != nil {
 		t.Error("zhipu 当前小时没有样本 → 该槽必须是 null（不是 0）")
 	}
 	if v.Keys[0].Kind != persist.KindPercent || len(v.Keys[0].Daily) != 7 {

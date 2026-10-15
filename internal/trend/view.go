@@ -13,8 +13,8 @@ const (
 	DefaultDays = 400
 	// MaxDays 回看天数上限（文件本身最多保留 dayKeep 天）。
 	MaxDays = 3650
-	// HourWindow 小时槽窗口长度（48h：够「当日」24 根柱 + 跨零点算小时差）。
-	HourWindow = 48
+	// HourWindow 小时槽窗口长度（168h = 7×24：够「7 日」的 168 根小时柱；「当日」24 根自然覆盖）。
+	HourWindow = 168
 )
 
 // View 趋势接口的响应体。

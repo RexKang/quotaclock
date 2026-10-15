@@ -87,8 +87,8 @@ func TestTrendsEndpoint(t *testing.T) {
 	if daily[len(daily)-1] == nil {
 		t.Error("daily 末位 = 今天，刚采过样不该为空")
 	}
-	if hours, _ := kv["hours"].([]any); len(hours) != 48 {
-		t.Errorf("hours 长度 = %d，期望 48", len(hours))
+	if hours, _ := kv["hours"].([]any); len(hours) != 168 {
+		t.Errorf("hours 长度 = %d，期望 168", len(hours))
 	}
 	if today := at.Format("2006-01-02"); kv["total_days"] != float64(1) || kv["first_day"] != today {
 		t.Errorf("累计天数/起始日 = %v / %v（期望 1 / %s）", kv["total_days"], kv["first_day"], today)

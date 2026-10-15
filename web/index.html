@@ -325,7 +325,7 @@
   .taxisline { position: absolute; left: 0; right: 0; border-top: 1px solid var(--axis); }
   .tthrow { position: absolute; left: 0; right: 0; border-top: 1px solid var(--err-bd); }
   .tcols { position: absolute; left: 0; right: 0; display: flex; align-items: flex-end; justify-content: center; gap: 4px; }
-  .tcol { position: relative; flex: 1 1 0; max-width: 72px; min-width: 3px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
+  .tcol { position: relative; flex: 1 1 0; max-width: 72px; min-width: 2px; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
   .tbar { width: 100%; border-radius: 2px 2px 0 0; }
   .tbar.tanim { transition: height .12s ease-out; }
   /* 0 值：轴上不画任何可见痕迹（画 2px 灰条会被读成「一个很小的值」），只留透明的悬停命中区 */
@@ -334,6 +334,8 @@
      改成把连续的无采样时段合并成一条淡色区段（见 paintNoSampleRuns）。列本身只留悬停命中。 */
   .tnrun { position: absolute; top: 0; height: 188px; background: var(--ov-run);
            border-left: 1px dashed var(--axis-dash); border-right: 1px dashed var(--axis-dash); border-radius: 3px; pointer-events: none; }
+  /* 「7 日」每天 0 点的分隔线：单条实线；与无采样区段的「淡底 + 虚线边」可区分（见 paintDayLines） */
+  .tday { position: absolute; top: 0; border-left: 1px solid var(--axis-dash); pointer-events: none; }
   .tval { font-size: 9.5px; line-height: 11px; height: 11px; color: var(--text-2b); font-family: var(--mono); white-space: nowrap; }
   .tval.pk { color: var(--text); font-weight: 600; }
   .ttag { font-size: 9.5px; line-height: 11px; height: 11px; color: var(--warn); white-space: nowrap; }
@@ -1473,7 +1475,7 @@ function renderApi() {
 
 const TREND_RANGES = [
   { key: 'day', label: '当日', hint: '今天 0-23 时，每小时一根（该小时实际用量）' },
-  { key: '7d', label: '7 日', hint: '近 7 天，每天一根（该日实际用量）' },
+  { key: '7d', label: '7 日', hint: '近 7 天（168 小时），每小时一根（该小时实际用量）' },
   { key: 'month', label: '月度', hint: '近 30 天，每天一根（该日实际用量）' },
   { key: 'quarter', label: '季度', hint: '近 13 周，每周一根（该周合计用量）' },
   { key: 'year', label: '年度', hint: '近 12 个月，每月一根（该月合计用量）' },
@@ -1636,6 +1638,54 @@ function seriesOfDays(k, kind, n) {
   });
 }
 
+// 「7 日」= 168 根小时柱（滚动最近 168 小时，末位 = 当前小时；数据源是后端 hours 槽，
+// 小时槽保留 14 天，窗口够用）。空槽不带 slot 字符串，整条槽序列从最后一个带 slot 的元素外推，
+// 不依赖浏览器时钟（避免页面打开时刻跨小时边界时整列错位）。
+const TREND_HOURS_7D = 168;
+function seriesOfHours7d(k, kind) {
+  const hs = (k && k.hours) || [];
+  const keep = hs.slice(-TREND_HOURS_7D);   // 定长连续、升序，末位 = 当前小时
+  let ai = -1;
+  for (let i = keep.length - 1; i >= 0; i--) if (keep[i] && keep[i].slot) { ai = i; break; }
+  const at = (i) => {
+    if (ai < 0) return null;
+    const base = new Date(String(keep[ai].slot) + ':00:00');   // "2026-10-15T13" → 本地时刻
+    return new Date(base.getTime() + (i - ai) * 3600e3);
+  };
+  const out = [];
+  for (let i = 0; i < keep.length; i++) {
+    const h = keep[i] && keep[i].slot ? keep[i] : null;
+    const dt = at(i);
+    const label = dt ? (fmtMD(ymd(dt)) + ' ' + pad2(dt.getHours()) + ' 时') : '';
+    if (kind === 'balance') {
+      const cur = h && typeof h.balance === 'number' ? h.balance : null;
+      const ph = i > 0 ? keep[i - 1] : null;
+      const prev = ph && typeof ph.balance === 'number' ? ph.balance : null;
+      let v = null, note = '';
+      if (cur === null) note = '无采样';
+      else if (prev === null) note = '无对比';
+      else if (prev - cur < 0) { v = 0; note = '充值'; }
+      else v = sumRound([prev - cur]);
+      out.push({
+        label, value: v, stub: v === 0, today: false, topup: note === '充值', note,
+        tip: { t: `${label}：${v === null ? (note || '无采样') : fmtMoney(v)}`, r: [] },
+      });
+    } else {
+      out.push(elemPercent(label, h && h.pct, false));
+    }
+    if (dt && dt.getHours() === 0) out[out.length - 1].dayFirst = true;   // 每天 0 点 → 天界标记
+  }
+  // 每天只给峰值那根柱标数字（168 根全标放不下；完整精度在悬停里给）
+  const byDay = {};
+  out.forEach((s, i) => {
+    if (typeof s.value !== 'number' || !(s.value > 0)) return;
+    const key = s.label.slice(0, 5);
+    if (byDay[key] === undefined || s.value > out[byDay[key]].value) byDay[key] = i;
+  });
+  for (const key of Object.keys(byDay)) out[byDay[key]].dayPeak = true;
+  return out;
+}
+
 // 周/月聚合：用量取区间合计（百分点可加），金额也取合计；峰值另存供核对。
 function seriesOfBuckets(k, kind, mode) {
   const buckets = [];
@@ -1688,7 +1738,7 @@ function seriesOfBuckets(k, kind, mode) {
 function seriesOf(k, kind, range) {
   switch (range) {
     case 'day': return seriesOfDay(k, kind);
-    case '7d': return seriesOfDays(k, kind, 7);
+    case '7d': return seriesOfHours7d(k, kind);
     case 'month': return seriesOfDays(k, kind, 30);
     case 'quarter': return seriesOfBuckets(k, kind, 'week');
     case 'year': return seriesOfBuckets(k, kind, 'month');
@@ -1719,40 +1769,50 @@ function trendChartHtml(kind, series, unit) {
     ? `<div class="tthrow" style="bottom:${Math.round(TREND_AXIS_H + TREND_BAR_H * 100 / scale)}px"></div>`
     : '';
   const hasAny = series.some(s => s.value !== null || s.stub);
-  // 柱太密（>20 根）时柱顶数字用能放下的最短形式（整数/一位小数），完整 2 位精度在悬停明细里
+  // 柱太密（>20 根）时柱顶数字用能放下的最短形式（整数/一位小数）；
+  // 「7 日」的 168 根更密（列距 ≈ 4px），全标糊成一片 —— 只给每天峰值那根标数字。
   const dense = series.length > 20;
+  const pkOnly = series.length > 100;
   const cols = series.map(s => {
     const v = typeof s.value === 'number' ? s.value : null;
     const tag = s.topup ? `<span class="${dense ? 'tdot' : 'ttag'}">${dense ? '' : '充值'}</span>` : '';
     const tip = `data-tip='${tipAttr(s.tip)}'`;
+    const dl = s.dayFirst ? ' dayfirst' : '';
     if (v === null) {
       // 只留一个可被悬停吸附的列（视觉由 paintNoSampleRuns 的区段淡带表达）
-      return `<div class="tcol nosample" ${tip}>${tag}</div>`;
+      return `<div class="tcol nosample${dl}" ${tip}>${tag}</div>`;
     }
     if (!(v > 0)) {
       // 顺序必须与普通柱一致（标签在前、柱体在后）：柱体是最后一个子元素才会落在基线上。
       // 0 值画「透明命中区」而不是灰条 —— 轴上任何可见痕迹都会被读成有值。
-      return `<div class="tcol" ${tip}>${tag}${dense ? '' : '<div class="tval">0.00</div>'}<div class="tzero"></div></div>`;
+      return `<div class="tcol${dl}" ${tip}>${tag}${dense ? '' : '<div class="tval">0.00</div>'}<div class="tzero"></div></div>`;
     }
     const px = Math.max(2, Math.round(v / scale * TREND_BAR_H * 10) / 10);
     const color = kind === 'balance' ? 'var(--accent)' : sevColor(slotSeverity(v, undefined));
-    // 密柱（>20 根、柱宽 <30px）放不下 "92.00"（约 26px > 24.2px 柱宽），
-    // 所以每根非零柱都标「能放下的最短形式」（整数 / 一位小数），2 位精度的完整值在页脚与悬停明细里给。
+    // 密柱（>20 根、柱宽 <30px）放不下 "92.00"（约 26px）；168 根时只标每天峰值，
+    // 标「能放下的最短形式」（整数 / 一位小数），2 位精度的完整值在悬停明细里给。
     const short = kind === 'percent' ? (v >= 10 ? String(Math.round(v)) : v.toFixed(1)) : v.toFixed(1);
-    const label = `<div class="tval${dense ? ' pk' : ''}">${dense ? short : v.toFixed(2)}</div>`;
-    return `<div class="tcol" ${tip}>${tag}${label}
+    const showNum = !dense || !pkOnly || s.dayPeak;
+    const label = showNum ? `<div class="tval${dense ? ' pk' : ''}">${dense ? short : v.toFixed(2)}</div>` : '';
+    return `<div class="tcol${dl}" ${tip}>${tag}${label}
       <div class="tbar" data-h="${px}" style="height:0px;background:${color}"></div></div>`;
   }).join('');
-  // 横轴：最多 8 个标签
-  const step = Math.max(1, Math.ceil(series.length / 8));
-  const xs = series.map((s, i) => (i % step === 0
-    ? `<div class="tx" style="left:${((i + 0.5) / series.length * 100).toFixed(3)}%">${esc(s.label)}</div>` : '')).join('');
+  // 横轴：「7 日」（168 根）按每天 0 点标日期（MM-DD）；其余区间均分、最多 8 个标签
+  let xs;
+  if (pkOnly) {
+    xs = series.map((s, i) => (s.dayFirst
+      ? `<div class="tx" style="left:${((i + 0.5) / series.length * 100).toFixed(3)}%">${esc(s.label.slice(0, 5))}</div>` : '')).join('');
+  } else {
+    const step = Math.max(1, Math.ceil(series.length / 8));
+    xs = series.map((s, i) => (i % step === 0
+      ? `<div class="tx" style="left:${((i + 0.5) / series.length * 100).toFixed(3)}%">${esc(s.label)}</div>` : '')).join('');
+  }
   const axisLine = `<div class="taxisline" style="bottom:${TREND_AXIS_H}px"></div>`;
   const empty = hasAny ? '' : '<div class="tempty">该区间暂无采样数据</div>';
   return `<div class="twrap">
     <div class="tyaxis">${yaxis}</div>
     <div class="tplot"><div class="tband"></div>${axisLine}${ref}
-      <div class="tcols" style="bottom:${TREND_AXIS_H}px;height:${TREND_PLOT_H - TREND_AXIS_H}px">${cols}</div>
+      <div class="tcols" style="bottom:${TREND_AXIS_H}px;height:${TREND_PLOT_H - TREND_AXIS_H}px${pkOnly ? ';gap:1px' : ''}">${cols}</div>
       ${xs}${empty}
     </div>
   </div>`;
@@ -1815,6 +1875,7 @@ function renderTrend() {
   paintBarHeights(trendAnimateNext);
   trendAnimateNext = false;
   paintNoSampleRuns();
+  paintDayLines();
   reapplyTrendHover();
   if (!box.dataset.bound) {
     box.dataset.bound = '1';
@@ -1915,6 +1976,27 @@ function paintNoSampleRuns() {
       d.style.width = ((b.right - a.left) / pr.width * 100).toFixed(3) + '%';
       plot.insertBefore(d, plot.firstChild);
       i = j + 1;
+    }
+  });
+}
+
+// 「7 日」每天 0 点画一条 1px 实线（168 根下靠它才分得清「哪天到哪天」；
+// 与无采样区段可区分：区段是淡底 + 左右虚线边，这里是单条实线）。
+// 位置与淡带同法（按列 rect 的百分比，缩放不错位）；渲染时只给列打 dayfirst 标记，重绘后由这里重画。
+function paintDayLines() {
+  document.querySelectorAll('#trendList .tplot').forEach(plot => {
+    plot.querySelectorAll('.tday').forEach(e => e.remove());
+    const cols = plot.querySelectorAll('.tcol.dayfirst');
+    if (!cols.length) return;
+    const pr = plot.getBoundingClientRect();
+    if (!pr.width) return;
+    for (const col of cols) {
+      const cr = col.getBoundingClientRect();
+      const d = document.createElement('div');
+      d.className = 'tday';
+      d.style.left = ((cr.left - pr.left) / pr.width * 100).toFixed(3) + '%';
+      d.style.height = (TREND_PLOT_H - TREND_AXIS_H) + 'px';
+      plot.insertBefore(d, plot.firstChild);
     }
   });
 }
