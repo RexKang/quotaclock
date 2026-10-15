@@ -1460,7 +1460,7 @@ function renderApi() {
  * 数据源 = GET /api/trends（后端每次成功采集更新内存聚合、每小时落盘，见 internal/trend）
  *
  * 口径（用户 260922 拍板）：
- *   非余额平台柱高 = 5 小时额度峰值（%）；DeepSeek 柱高 = 当日实际消费（元）
+ *   非余额平台柱高 = 该时段实际用量（额度百分比差额之和，%）；DeepSeek 柱高 = 当日实际消费（元）
  *   粒度：当日 = 24 小时柱；7 日 = 7 日柱；月度 = 近 30 日柱；季度 = 近 13 周柱；年度 = 近 12 月柱
  *   0.00 与「无采样」必须可区分：0 → 2px 细底线；无采样 → 虚线空槽（后端给 null，不是 0）
  *
@@ -1472,11 +1472,11 @@ function renderApi() {
  * ============================================================ */
 
 const TREND_RANGES = [
-  { key: 'day', label: '当日', hint: '今天 0-23 时，每小时一根（该小时的 5 小时额度峰值）' },
-  { key: '7d', label: '7 日', hint: '近 7 天，每天一根（当日峰值）' },
-  { key: 'month', label: '月度', hint: '近 30 天，每天一根' },
-  { key: 'quarter', label: '季度', hint: '近 13 周，每周一根（取该周峰值）' },
-  { key: 'year', label: '年度', hint: '近 12 个月，每月一根（取该月峰值）' },
+  { key: 'day', label: '当日', hint: '今天 0-23 时，每小时一根（该小时实际用量）' },
+  { key: '7d', label: '7 日', hint: '近 7 天，每天一根（该日实际用量）' },
+  { key: 'month', label: '月度', hint: '近 30 天，每天一根（该日实际用量）' },
+  { key: 'quarter', label: '季度', hint: '近 13 周，每周一根（该周合计用量）' },
+  { key: 'year', label: '年度', hint: '近 12 个月，每月一根（该月合计用量）' },
 ];
 const TREND_PLOT_H = 210;   // 图区高（卡高 268 = 12+30+6+210+10；卡脚摘要已按用户要求删掉）
 const TREND_AXIS_H = 22;    // 轴行高
@@ -1559,8 +1559,9 @@ function tipAttr(t) { return esc(JSON.stringify(t)).replace(/'/g, '&#39;'); }
 // 元素：{ label, value(数字|null), note, stub(0 值也有采样), topup, today, tip:{t,r} }
 // elemPercent 百分比口径：**柱高 = 该时段实际用量**（相邻样本差额之和），不是当时的水平值 ——
 // 11 点 4% → 12 点 7%，这一小时用了 3%，柱高就该是 3（用户 260922 判定）。
-// 窗口重置（数值下跌）按 (窗口容量 − 上次值) + 本次补回：99 → 100 → 3 = (100−99) + 3 = 4。
-// 水平值（峰值）仍然记着，放在悬停明细里。
+// 窗口重置（数值下跌）那一步只记新窗口的本次值（作废的剩余额度不计）：
+// 88 → 90 → 91 → 0 → 1 的逐样本差额是 +2 +1 +0 +1 = 4。
+// 水平值（峰值）仍然记录在聚合里，供口径核对（悬停只给「时间：数据」）。
 function elemPercent(label, pm, today) {
   const usage = pm && typeof pm.gain === 'number' ? pm.gain : null;
   const peak = pm && typeof pm.peak === 'number' ? pm.peak : null;
@@ -1635,7 +1636,7 @@ function seriesOfDays(k, kind, n) {
   });
 }
 
-// 周/月聚合：额度取区间峰值，金额取区间合计（金额可加，百分比不可加 —— 所以百分比取峰值不取和）。
+// 周/月聚合：用量取区间合计（百分点可加），金额也取合计；峰值另存供核对。
 function seriesOfBuckets(k, kind, mode) {
   const buckets = [];
   const idx = {};
@@ -1673,7 +1674,7 @@ function seriesOfBuckets(k, kind, mode) {
         tip: { t: `${b.label}：${v === null ? '无采样' : fmtMoney(v)}`, r: [] },
       };
     }
-    // 用量是可加量（百分点），所以周/月取合计；峰值另列在悬停里
+    // 用量是可加量（百分点），所以周/月取合计；峰值另存供核对
     const v = b.peaks.length ? sumRound([b.gains]) : null;
     const peak = b.peaks.length ? Math.max(...b.peaks) : null;
     return {
@@ -1718,11 +1719,8 @@ function trendChartHtml(kind, series, unit) {
     ? `<div class="tthrow" style="bottom:${Math.round(TREND_AXIS_H + TREND_BAR_H * 100 / scale)}px"></div>`
     : '';
   const hasAny = series.some(s => s.value !== null || s.stub);
-  // 柱太密（>20 根，柱宽 < 30px）时只标峰值那根：数字放不下会压到邻柱，精确值交给悬停明细
+  // 柱太密（>20 根）时柱顶数字用能放下的最短形式（整数/一位小数），完整 2 位精度在悬停明细里
   const dense = series.length > 20;
-  const nums = series.filter(s => typeof s.value === 'number').map(s => s.value);
-  const peakVal = nums.length ? Math.max(...nums) : null;
-  let peakDone = false;
   const cols = series.map(s => {
     const v = typeof s.value === 'number' ? s.value : null;
     const tag = s.topup ? `<span class="${dense ? 'tdot' : 'ttag'}">${dense ? '' : '充值'}</span>` : '';
@@ -1738,8 +1736,6 @@ function trendChartHtml(kind, series, unit) {
     }
     const px = Math.max(2, Math.round(v / scale * TREND_BAR_H * 10) / 10);
     const color = kind === 'balance' ? 'var(--accent)' : sevColor(slotSeverity(v, undefined));
-    const isPeak = dense && !peakDone && v === peakVal;
-    if (isPeak) peakDone = true;
     // 密柱（>20 根、柱宽 <30px）放不下 "92.00"（约 26px > 24.2px 柱宽），
     // 所以每根非零柱都标「能放下的最短形式」（整数 / 一位小数），2 位精度的完整值在页脚与悬停明细里给。
     const short = kind === 'percent' ? (v >= 10 ? String(Math.round(v)) : v.toFixed(1)) : v.toFixed(1);
@@ -1789,8 +1785,8 @@ function trendCardHtml(prov, k) {
   const note = kind === 'balance'
     ? '柱高 = 该时段的实际消费（相邻余额快照之差）。充值的时段不出值，标「充值」；采样有缺口或起点不全时首尾差不等于真实消费，画成虚线空槽 —— 宁可不给值，也不给一个错的数。'
     : '柱高 = 该时段的**实际用量**（相邻采样的额度百分比差额之和）：11 点 4%、12 点 7% → 12 点这小时用了 3%。'
-      + '5 小时额度是重置型窗口，数值下跌即窗口重置，那段按 (100 − 上次值) + 本次补回（多次重置无法从样本识别，按一次算，结果是下限）。'
-      + '虚线空槽 = 那个时段没采到数据（不是 0）；该时段峰值在悬停明细里。';
+      + '5 小时额度是重置型窗口，数值下跌即窗口重置；重置那一步只记新窗口的本次值（作废的剩余额度不计）。'
+      + '虚线空槽 = 那个时段没采到数据（不是 0）。';
   return `<div class="tcard" title="${esc(note)}">
     <div class="thead">
       <div class="tname">${esc(prov.name)}<span class="tsub">${esc(trendSubLine(prov)) || (hasData ? '&nbsp;' : '尚无趋势数据')}</span></div>
